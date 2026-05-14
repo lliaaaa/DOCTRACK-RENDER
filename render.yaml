@@ -3,7 +3,7 @@ services:
     name: doctrack-system
     env: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn -c gunicorn.conf.py run:app"
+    startCommand: "python -m flask --app run db upgrade && gunicorn -c gunicorn.conf.py run:app"
     envVars:
       - key: SECRET_KEY
         generateValue: true
