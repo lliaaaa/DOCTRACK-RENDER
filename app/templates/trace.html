@@ -38,15 +38,18 @@
     </form>
   </div>
 
-  {% if q %}
-    {% if not results %}
+  {% if not results and q %}
       <div class="trace-box text-center" style="color:#999;padding:40px;">
         <i class="fa fa-search fa-2x mb-3" style="color:#ddd;"></i>
         <p>No documents found matching "<strong>{{ q }}</strong>".</p>
       </div>
-    {% else %}
+  {% elif results %}
       <p style="color:#666;font-size:13px;margin-bottom:12px;">
-        Found <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }} matching "<strong>{{ q }}</strong>"
+        {% if q %}
+          Found <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }} matching "<strong>{{ q }}</strong>"
+        {% else %}
+          Showing all <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }}
+        {% endif %}
       </p>
 
       {% for r in results %}
@@ -78,7 +81,6 @@
         </div>
       </div>
       {% endfor %}
-    {% endif %}
   {% endif %}
 </div>
 {% endblock %}
