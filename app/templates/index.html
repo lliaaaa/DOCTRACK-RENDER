@@ -241,6 +241,19 @@ tr:hover td { background: #FBF8F5; }
         <ul class="dropdown-menu dropdown-menu-end" style="font-size:13px;min-width:200px;">
             <li><span class="dropdown-item-text text-muted small">{{ current_user.department }}</span></li>
             <li><hr class="dropdown-divider"></li>
+            <li>
+              <div class="dropdown-item-text" style="padding:6px 12px;">
+                <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"><i class="fa fa-palette me-1"></i>Color Theme</div>
+                <div style="display:flex;gap:7px;flex-wrap:wrap;">
+                  <button onclick="setTheme('red')"   title="Classic Red"   style="width:22px;height:22px;border-radius:50%;background:#b71c1c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="red"></button>
+                  <button onclick="setTheme('slate')" title="Dark Slate"    style="width:22px;height:22px;border-radius:50%;background:#334155;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="slate"></button>
+                  <button onclick="setTheme('warm')"  title="Warm Gray"     style="width:22px;height:22px;border-radius:50%;background:#78716c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="warm"></button>
+                  <button onclick="setTheme('cool')"  title="Cool Gray"     style="width:22px;height:22px;border-radius:50%;background:#6b7280;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="cool"></button>
+                  <button onclick="setTheme('sand')"  title="Sand"          style="width:22px;height:22px;border-radius:50%;background:#92806a;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="sand"></button>
+                </div>
+              </div>
+            </li>
+            <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal" style="cursor:pointer;"><i class="fa fa-key me-2"></i>Change Password</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="fa fa-right-from-bracket me-2"></i>Sign Out</a></li>
@@ -357,6 +370,29 @@ async function pollNotifications() {
 }
 pollNotifications();
 setInterval(pollNotifications, 30000); // Poll every 30s
+
+// ── Color Theme Switcher ──────────────────────────────────────────────
+const THEMES = {
+  red:     { primary:'#b71c1c', dark:'#8f0707', mid:'#c62828', sidebar:'#5c0a0a', bg:'#F0EDE8' },
+  slate:   { primary:'#475569', dark:'#334155', mid:'#64748b', sidebar:'#1e293b', bg:'#F1F5F9' },
+  warm:    { primary:'#78716c', dark:'#57534e', mid:'#a8a29e', sidebar:'#3d3734', bg:'#F5F2EE' },
+  cool:    { primary:'#6b7280', dark:'#4b5563', mid:'#9ca3af', sidebar:'#374151', bg:'#F3F4F6' },
+  sand:    { primary:'#92806a', dark:'#6e5f4c', mid:'#b09880', sidebar:'#4a3c2e', bg:'#F7F3EE' },
+};
+function applyTheme(name) {
+  const t = THEMES[name] || THEMES.red;
+  const r = document.documentElement.style;
+  r.setProperty('--gov-red',      t.primary);
+  r.setProperty('--gov-red-dark', t.dark);
+  r.setProperty('--gov-red-mid',  t.mid);
+  r.setProperty('--bg-sidebar',   t.sidebar);
+  r.setProperty('--bg',           t.bg);
+  document.querySelectorAll('.theme-swatch').forEach(s => {
+    s.style.border = s.dataset.theme === name ? '2px solid #000' : '2px solid transparent';
+  });
+}
+function setTheme(name) { localStorage.setItem('doctrack-theme', name); applyTheme(name); }
+applyTheme(localStorage.getItem('doctrack-theme') || 'red');
 </script>
 </body>
 </html>
