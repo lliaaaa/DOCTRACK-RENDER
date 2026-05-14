@@ -836,7 +836,7 @@ def reject_document(record_id):
 
 @bp.route("/documents/assign/<int:record_id>", methods=["POST"])
 @login_required
-@role_required("admin", "staff")
+@role_required("admin", "user")
 def assign_document(record_id):
     record = db.session.get(Document, record_id) or abort(404)
     data        = request.get_json() or {}
