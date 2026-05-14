@@ -1,3 +1,4 @@
+
 {% extends 'index.html' %}
 {% block content %}
 <style>
@@ -101,6 +102,11 @@
         <form method="POST" action="{{ url_for('main.delete_document', record_id=record.id) }}" style="display:inline" onsubmit="return confirm('Permanently delete this document?')">
           <button class="btn-sm-action ba-delete"><i class="fa fa-trash me-1"></i>Delete</button>
         </form>
+      </div>
+      {% endif %}
+      {% if current_user.role == 'staff' and record.status != 'Closed' and record.status != 'Assigned' %}
+      <div class="d-flex gap-2 flex-wrap mt-3" style="padding-top:14px;border-top:1px solid #EDE8E0;">
+        <button class="btn-sm-action ba-edit" onclick="openAssign()" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;"><i class="fa fa-user-plus me-1"></i>Assign</button>
       </div>
       {% endif %}
     </div>
@@ -331,23 +337,7 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('confirmTransfer')?.addEventListener('click',function(){
     const dept=document.getElementById('tDept').value;
     const remarks=document.getElementById('tRemarks').value;
-    if(!dept){showMessage('Required','Please select a target department.');return;}
-    doPost('/documents/transfer/{{ record.id }}',{to_department:dept,remarks},this,
-      '<i class="fa fa-paper-plane me-1"></i>Send Transfer',
-      d=>{transferModal.hide();showMessage('Success',d.message);setTimeout(()=>location.reload(),900);});
-  });
-
-  document.getElementById('confirmClose')?.addEventListener('click',function(){
-    const remarks=document.getElementById('closeRemarks').value;
-    doPost('/documents/close/{{ record.id }}',{remarks},this,
-      '<i class="fa fa-lock me-1"></i>Close Document',
-      ()=>location.reload());
-  });
-
-  document.getElementById('confirmPulloutBtn')?.addEventListener('click',function(){
-    const dept=document.getElementById('pulloutDept').value;
-    const remarks=document.getElementById('pulloutRemarks').value;
-    if(!dept){showMessage('Required','Please select an office.');return;}
+    if(!dept){showMessage('Required','Please select a target department.');return
     doPost('/documents/pullout/{{ record.id }}',{to_department:dept,remarks},this,
       '<i class="fa fa-arrow-rotate-left me-1"></i>Confirm Pull Out',
       d=>{pulloutModal.hide();showMessage('Success',d.message);setTimeout(()=>location.reload(),900);});
