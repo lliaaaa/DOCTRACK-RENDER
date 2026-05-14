@@ -1,0 +1,170 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.staff-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.staff-container { background: white; border-radius: 8px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,.05); }
+.staff-table { width: 100%; border-collapse: collapse; }
+.staff-table th, .staff-table td { padding: 11px 13px; text-align: left; border-bottom: 1px solid #eee; font-size: 13px; }
+.staff-table th { background: #f1f3f5; font-weight: 600; text-transform: uppercase; font-size: 11px; }
+.role-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.role-admin { background: #f8d7da; color: #842029; }
+.role-user { background: #d1e7dd; color: #0f5132; }
+.role-tempadmin { background: #fff3cd; color: #664d03; }
+.status-active { color: #198754; font-weight: 600; font-size: 12px; }
+.status-inactive { color: #dc3545; font-weight: 600; font-size: 12px; }
+.action-btns { display: flex; gap: 5px; }
+.action-btns button, .action-btns a { padding: 4px 10px; font-size: 11px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: 600; }
+.btn-edit-s { background: #0dcaf0; color: #000; }
+.btn-deactivate { background: #fd7e14; color: white; }
+.btn-delete-s { background: #dc3545; color: white; }
+.temp-admin-toggle { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; background: #fff8e1; border: 1px solid #ffe082; margin-bottom: 12px; }
+.temp-admin-toggle input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: #dc3545; }
+.temp-admin-toggle label { font-size: 13px; font-weight: 600; color: #7A5700; cursor: pointer; margin: 0; }
+.temp-admin-toggle small { font-size: 11px; color: #999; display: block; }
+</style>
+
+<div class="content">
+  <div class="staff-header">
+    <h1 class="dashboard-title">Staff Members</h1>
+    <button class="btn btn-danger" onclick="document.getElementById('addModal').style.display='flex'">
+      <i class="fa fa-plus me-1"></i> Add Staff
+    </button>
+  </div>
+
+  <div class="staff-container">
+    <table class="staff-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.full_name }}</strong></td>
+          <td>{{ u.email }}</td>
+          <td>
+            {% if u.is_temp_admin %}
+              <span class="role-badge role-tempadmin">⏳ TEMP ADMIN</span>
+            {% else %}
+              <span class="role-badge role-{{ u.role|lower }}">{{ u.role|upper }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_deactivated %}
+            <span class="status-inactive">🔴 Inactive</span>
+            {% else %}
+            <span class="status-active">🟢 Active</span>
+            {% endif %}
+          </td>
+          <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else '-' }}</td>
+          <td>
+            {% if u.role != 'admin' or u.is_temp_admin %}
+            <div class="action-btns">
+              <button class="btn-edit-s" 
+              data-id="{{ u.id }}"
+              data-name="{{ u.full_name }}"
+              data-email="{{ u.email }}"
+              data-tempadmin="{{ 'true' if u.is_temp_admin else 'false' }}"
+              onclick="openEditModal(this)">Edit</button>
+              {% if not u.is_temp_admin %}
+              <form method="POST" action="{{ url_for('main.toggle_user', id=u.id) }}" style="display:inline">
+                <button class="btn-deactivate" type="submit">{{ 'Activate' if u.is_deactivated else 'Deactivate' }}</button>
+              </form>
+              <form method="POST" action="{{ url_for('main.delete_user', id=u.id) }}" style="display:inline"
+                    onsubmit="return confirm('Delete {{ u.full_name }}?')">
+                <button class="btn-delete-s" type="submit">Delete</button>
+              </form>
+              {% endif %}
+            </div>
+            {% else %}
+            <span style="color:#bbb;font-size:11px;">Protected</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="text-align:center;color:#999;padding:30px;">No staff members found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD STAFF MODAL -->
+<div id="addModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:10px;padding:28px;max-width:420px;width:90%;position:relative;">
+    <button onclick="document.getElementById('addModal').style.display='none'"
+            style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#999;">✕</button>
+    <h5 class="mb-3"><i class="fa fa-user-plus me-2 text-danger"></i>Add Staff Member</h5>
+    <form method="POST" action="{{ url_for('main.add_user') }}">
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Full Name</label>
+        <input type="text" name="full_name" class="form-control" required>
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" name="email" class="form-control" required>
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Password</label>
+        <input type="password" name="password" class="form-control" required minlength="6">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Role</label>
+        <select name="role" class="form-select">
+          <option value="admin" selected>Admin</option>
+          <option value="user">User</option>
+        </select>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-secondary flex-fill" onclick="document.getElementById('addModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-danger flex-fill">Add Staff</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT STAFF MODAL -->
+<div id="editModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:2000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:10px;padding:28px;max-width:420px;width:90%;position:relative;">
+    <button onclick="document.getElementById('editModal').style.display='none'"
+            style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#999;">✕</button>
+    <h5 class="mb-3"><i class="fa fa-user-edit me-2 text-info"></i>Edit Staff Member</h5>
+    <form id="editForm" method="POST">
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Full Name</label>
+        <input type="text" name="full_name" id="editFullName" class="form-control" required>
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Email</label>
+        <input type="email" name="email" id="editEmail" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">New Password <span class="text-muted fw-normal">(leave blank to keep current)</span></label>
+        <input type="password" name="new_password" class="form-control" minlength="6" placeholder="Min 6 characters">
+      </div>
+      <div class="temp-admin-toggle">
+        <input type="checkbox" name="give_admin_access" id="giveAdminCheck">
+        <div>
+          <label for="giveAdminCheck">⚡ Give temporary admin access</label>
+          <small>Uncheck to revoke and revert to regular user.</small>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-secondary flex-fill" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn btn-info text-white flex-fill">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEditModal(btn) {
+  document.getElementById('editFullName').value = btn.dataset.name;
+  document.getElementById('editEmail').value = btn.dataset.email;
+  document.getElementById('giveAdminCheck').checked = btn.dataset.tempadmin === 'true';
+  document.getElementById('editForm').action = `/admin/users/edit/${btn.dataset.id}`;
+  document.getElementById('editModal').style.display = 'flex';
+}
+</script>
+{% endblock %}

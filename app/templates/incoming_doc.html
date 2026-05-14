@@ -1,0 +1,307 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+
+  <!-- PAGE HEADER -->
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Receive Documents</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Transfers awaiting receipt by <strong>{{ current_user.department }}</strong></div>
+  </div>
+
+  <!-- SEARCH BAR -->
+  <div class="gov-card" style="padding:14px 18px;margin-bottom:16px;">
+    <form method="GET" action="{{ url_for('main.incoming_documents') }}" class="d-flex gap-2 flex-wrap align-items-center">
+      <input type="text" name="q" value="{{ q or '' }}" class="form-control"
+             placeholder="Search by Document ID, title, or office..."
+             style="max-width:480px;font-size:13px;" autofocus>
+      <button class="btn btn-danger px-4" style="font-size:13px;">
+        <i class="fa fa-search me-1"></i> Search
+      </button>
+      {% if q %}
+      <a href="{{ url_for('main.incoming_documents') }}" class="btn btn-outline-secondary" style="font-size:13px;">
+        <i class="fa fa-xmark me-1"></i> Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- PENDING TRANSFERS -->
+  {% if pending_transfers %}
+  <div class="gov-card" style="border-left:3px solid var(--gov-red);margin-bottom:18px;">
+    <div class="gov-card-header">
+      <div class="ci" style="background:var(--gov-red);"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h3>Awaiting Receipt</h3>
+      <span class="cc">{{ pending_transfers|length }}</span>
+    </div>
+    <div style="background:#FDE8E8;border:1px solid #FACACA;border-radius:5px;padding:8px 10px;font-size:12px;color:#8B0000;margin-bottom:12px;">
+      <i class="fa fa-circle-info me-1"></i> These documents have been transferred to your office and are awaiting confirmation. Click <strong>Receive</strong> to accept them.
+    </div>
+    <div style="overflow-x:auto;">
+    <table id="pendingTable">
+      <thead>
+        <tr>
+          <th>Document ID</th>
+          <th>Title</th>
+          <th>Type</th>
+          <th>Action to be Taken</th>
+          <th>Transferred By</th>
+          <th>From</th>
+          <th>SLA Status</th>
+          <th>Date Transferred</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in pending_transfers %}
+        {% set r = h.record %}
+        {% set sla = h._sla %}
+        <tr style="{% if sla and sla.tier == 'red' %}background:#FFEBEE;{% elif sla and sla.tier == 'yellow' %}background:#FFF8E1;{% endif %}">
+          <td><span class="doc-id">{{ r.document_code }}</span></td>
+          <td style="font-weight:500;">{{ r.title }}</td>
+          <td style="font-size:12px;">{{ r.doc_type }}</td>
+          <td style="font-size:12px;">
+            {% if r.action_taken %}
+            <span style="display:inline-block;padding:2px 7px;border-radius:4px;font-size:11px;background:#EFF6FF;color:#1E40AF;border:1px solid #BFDBFE;">{{ r.action_taken }}</span>
+            {% else %}<span style="color:var(--muted);">—</span>{% endif %}
+          </td>
+          <td style="font-size:12px;"><i class="fa fa-user fa-xs me-1" style="color:var(--muted);"></i>{{ h.action_by or '-' }}</td>
+          <td><strong>{{ h.from_department }}</strong></td>
+          <td style="min-width:110px;">
+            {% if sla %}
+            {% set tc = {'blue':'#2196F3','green':'#4CAF50','yellow':'#FF9800','red':'#F44336'} %}
+            {% set tbg = {'blue':'#E3F2FD','green':'#E8F5E9','yellow':'#FFF8E1','red':'#FFEBEE'} %}
+            <span style="font-size:9.5px;font-weight:700;border-radius:3px;padding:1px 6px;background:{{ tbg[sla.tier] }};color:{{ tc[sla.tier] }};">{{ sla.tier_label }}</span>
+            <div style="height:4px;background:#e0e0e0;border-radius:2px;margin-top:3px;overflow:hidden;">
+              <div style="height:4px;width:{{ sla.pct }}%;background:{{ tc[sla.tier] }};border-radius:2px;"></div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:1px;">{{ sla.hours_left }}h left</div>
+            {% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">{{ h.timestamp.strftime('%b %d, %Y %I:%M %p') if h.timestamp else '-' }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('main.document_detail', record_id=r.id) }}" class="btn-sm-action ba-view"><i class="fa fa-eye me-1"></i>View</a>
+              <button class="btn-sm-action ba-receive receive-btn" data-record-id="{{ r.id }}"><i class="fa fa-check me-1"></i>Receive</button>
+              <button class="btn-sm-action ba-danger reject-btn" data-record-id="{{ r.id }}" style="color:#dc3545;"><i class="fa fa-xmark me-1"></i>Reject</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% else %}
+  <div style="background:#F5F0E8;border:1px solid #DED8CF;border-radius:6px;padding:12px 16px;font-size:12px;color:var(--muted);margin-bottom:18px;">
+    <i class="fa fa-inbox me-2"></i>No pending transfers for your department{% if q %} matching "<strong>{{ q }}</strong>"{% endif %}.
+  </div>
+  {% endif %}
+
+  <!-- RECEIPT HISTORY -->
+  <div class="gov-card">
+    <div class="gov-card-header">
+      <div class="ci"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <h3>Receipt History</h3>
+      <span class="cc">{{ transfer_history|length }}</span>
+    </div>
+    {% if transfer_history %}
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Document ID</th>
+          <th>Title</th>
+          <th>From Office</th>
+          <th>Actioned By</th>
+          <th>Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in transfer_history %}
+        <tr>
+          <td>
+            <a href="{{ url_for('main.document_detail', record_id=h.record.id) }}" class="doc-id" style="text-decoration:none;">
+              {{ h.record.document_code }}
+            </a>
+          </td>
+          <td style="font-weight:500;">{{ h.record.title }}</td>
+          <td><strong>{{ h.from_department }}</strong></td>
+          <td style="font-size:12px;"><i class="fa fa-user fa-xs me-1" style="color:var(--muted);"></i>{{ h.action_by or '-' }}</td>
+          <td style="font-size:11px;color:var(--muted);white-space:nowrap;">{{ h.timestamp.strftime('%b %d, %Y %I:%M %p') if h.timestamp else '-' }}</td>
+          <td>
+            {% if h.action_type == 'received' %}
+            <span class="badge bg-success" style="font-size:11px;"><i class="fa fa-check me-1"></i>Received</span>
+            {% elif h.action_type == 'rejected_transfer' %}
+            <span class="badge bg-danger" style="font-size:11px;"><i class="fa fa-xmark me-1"></i>Rejected</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--muted);padding:28px;font-size:13px;">
+      <i class="fa fa-inbox fa-lg mb-2 d-block"></i>No receipt history yet.
+    </p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- RECEIPT CONFIRMATION MODAL -->
+<div class="modal fade" id="receiptModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-check-circle me-2" style="color:#198754;"></i>Confirm Receipt</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0;font-size:14px;">Confirm receipt of this document? You will be automatically assigned as the handler and the document will appear in your Assigned queue.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-gov" id="confirmReceiptBtn"><i class="fa fa-check me-1"></i>Confirm Receipt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- REJECTION CONFIRMATION MODAL -->
+<div class="modal fade" id="rejectionModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-circle-xmark me-2" style="color:#dc3545;"></i>Reject Transfer</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#FDE8E8;border:1px solid #FACACA;border-radius:5px;padding:8px 10px;font-size:12px;color:#8B0000;margin-bottom:12px;">
+          <i class="fa fa-triangle-exclamation me-1"></i> Rejecting this transfer will return the document to the sending department.
+        </div>
+        <p style="margin:0;font-size:14px;">Are you sure you want to reject this document?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Keep Transfer</button>
+        <button class="btn-gov" id="confirmRejectBtn" style="background:#dc3545;border-color:#dc3545;">
+          <i class="fa fa-xmark me-1"></i>Yes, Reject
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGE MODAL -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="messageTitle">Message</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="messageBody" style="margin:0;"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov" data-bs-dismiss="modal">Okay</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let receiptModal   = null;
+let rejectionModal = null;
+let messageModal   = null;
+let currentReceiptRecordId = null;
+let currentRejectRecordId  = null;
+
+function showMessage(title, message) {
+  if (messageModal) {
+    document.getElementById('messageTitle').textContent = title;
+    document.getElementById('messageBody').textContent  = message;
+    messageModal.show();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const receiptModalEl   = document.getElementById('receiptModal');
+  const rejectionModalEl = document.getElementById('rejectionModal');
+  const messageModalEl   = document.getElementById('messageModal');
+
+  if (receiptModalEl)   receiptModal   = new bootstrap.Modal(receiptModalEl);
+  if (rejectionModalEl) rejectionModal = new bootstrap.Modal(rejectionModalEl);
+  if (messageModalEl)   messageModal   = new bootstrap.Modal(messageModalEl);
+
+  document.querySelectorAll('.receive-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      currentReceiptRecordId = this.dataset.recordId;
+      if (receiptModal) receiptModal.show();
+    });
+  });
+
+  document.querySelectorAll('.reject-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      currentRejectRecordId = this.dataset.recordId;
+      if (rejectionModal) rejectionModal.show();
+    });
+  });
+
+  const confirmReceiptBtn = document.getElementById('confirmReceiptBtn');
+  if (confirmReceiptBtn) {
+    confirmReceiptBtn.addEventListener('click', async function() {
+      this.disabled = true;
+      this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Processing...';
+      try {
+        const res  = await fetch(`/documents/receive/${currentReceiptRecordId}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+          receiptModal.hide();
+          showMessage('Success', data.message);
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showMessage('Failed', data.message || 'Failed to receive.');
+          this.disabled = false;
+          this.innerHTML = '<i class="fa fa-check me-1"></i>Confirm Receipt';
+        }
+      } catch (err) {
+        showMessage('Error', 'An error occurred.');
+        this.disabled = false;
+        this.innerHTML = '<i class="fa fa-check me-1"></i>Confirm Receipt';
+      }
+    });
+  }
+
+  const confirmRejectBtn = document.getElementById('confirmRejectBtn');
+  if (confirmRejectBtn) {
+    confirmRejectBtn.addEventListener('click', async function() {
+      this.disabled = true;
+      this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Processing...';
+      try {
+        const res  = await fetch(`/documents/reject/${currentRejectRecordId}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+          rejectionModal.hide();
+          showMessage('Rejected', data.message);
+          setTimeout(() => location.reload(), 1000);
+        } else {
+          showMessage('Failed', data.message || 'Failed to reject.');
+          this.disabled = false;
+          this.innerHTML = '<i class="fa fa-xmark me-1"></i>Yes, Reject';
+        }
+      } catch (err) {
+        showMessage('Error', 'An error occurred.');
+        this.disabled = false;
+        this.innerHTML = '<i class="fa fa-xmark me-1"></i>Yes, Reject';
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

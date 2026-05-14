@@ -1,0 +1,313 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div class="d-flex justify-content-between align-items-start mb-4" style="border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <div>
+      <h1 class="dashboard-title">Release Documents</h1>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Release documents assigned to you in <strong>{{ current_user.department }}</strong></div>
+    </div>
+  </div>
+
+  {% if records %}
+  <div class="gov-card" style="border-left:3px solid #7A5700;margin-bottom:18px;">
+    <div class="gov-card-header">
+      <div class="ci"><i class="fa-solid fa-paper-plane"></i></div>
+      <h3>Documents Assigned to You</h3>
+      <span class="cc">{{ records|length }}</span>
+    </div>
+    <div style="background:#FEF9EC;border:1px solid #F5D86A;border-radius:5px;padding:8px 10px;font-size:12px;color:#7A5700;margin-bottom:12px;">
+      <i class="fa fa-circle-info me-1"></i> You can only release documents assigned to you. The receiving office will see it in their Incoming list to confirm receipt.
+    </div>
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>Document ID</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for r in records %}
+        {% set auto_step = svp_auto_dests.get(r.document_id) if svp_auto_dests is defined else None %}
+        <tr>
+          <td><span class="doc-id">{{ r.document_code }}</span></td>
+          <td style="font-weight:500;">{{ r.title }}</td>
+          <td style="font-size:12px;">{{ r.doc_type }}</td>
+          <td><span class="p-{{ (r.priority or 'normal')|lower }}">{{ r.priority or 'Normal' }}</span></td>
+          <td><span class="status-badge s-process">{{ r.status }}</span></td>
+          <td>
+            {% if r.id in pending_transfer_ids %}
+            <span class="badge bg-warning" style="font-size:11px;"><i class="fa fa-clock me-1"></i>Pending Receipt</span>
+            {% else %}
+            <button class="btn-sm-action ba-transfer transfer-btn"
+                    data-record-id="{{ r.id }}"
+                    data-doc-id="{{ r.document_code }}"
+                    data-title="{{ r.title }}"
+                    data-is-svp="{{ 'true' if auto_step else 'false' }}"
+                    data-auto-dest="{{ auto_step[1] if auto_step and auto_step[1] else '' }}"
+                    data-auto-status="{{ auto_step[0] if auto_step else '' }}">
+              <i class="fa fa-paper-plane me-1"></i>Release
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  {% else %}
+  <div style="background:#F5F0E8;border:1px solid #DED8CF;border-radius:6px;padding:12px 16px;font-size:12px;color:var(--muted);margin-bottom:18px;">
+    <i class="fa fa-folder-open me-2"></i>No documents currently assigned to you for release.
+  </div>
+  {% endif %}
+
+  <!-- TRANSFER HISTORY -->
+  <div class="gov-card">
+    <div class="gov-card-header">
+      <div class="ci"><i class="fa-solid fa-clock-rotate-left"></i></div>
+      <h3>Transfer History from {{ current_user.department }}</h3>
+      <span class="cc">{{ outgoing|length }}</span>
+    </div>
+    {% if outgoing %}
+    <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>Document ID</th><th>Title</th><th>Sent To</th><th>Status</th><th>Transferred By</th><th>Date & Time</th><th></th></tr></thead>
+      <tbody>
+        {% for h in outgoing %}
+        <tr>
+          <td><span class="doc-id">{{ h.record.document_code }}</span></td>
+          <td style="font-weight:500;">{{ h.record.title }}</td>
+          <td><i class="fa fa-arrow-right fa-xs me-1" style="color:var(--muted);"></i><strong>{{ h.to_department }}</strong></td>
+          <td><span class="status-badge s-process">{{ h.status }}</span></td>
+          <td style="font-size:12px;color:var(--muted);">{{ h.action_by or '-' }}</td>
+          <td style="font-size:11px;color:var(--muted);">{{ h.timestamp.strftime('%b %d, %Y %I:%M %p') if h.timestamp else '-' }}</td>
+          <td>
+            {% if transfer_status.get(h.id) == 'received' %}
+            <span class="badge bg-success" style="font-size:11px;"><i class="fa fa-check me-1"></i>Received</span>
+            {% elif transfer_status.get(h.id) == 'rejected' %}
+            <span class="badge bg-danger" style="font-size:11px;"><i class="fa fa-xmark me-1"></i>Rejected</span>
+            {% else %}
+            <button class="btn-sm-action ba-danger cancel-transfer-btn" data-transfer-id="{{ h.id }}" data-doc-title="{{ h.record.title }}" style="font-size:11px;">
+              <i class="fa fa-xmark me-1"></i>Cancel
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p style="text-align:center;color:var(--muted);padding:28px;font-size:13px;"><i class="fa fa-inbox fa-lg mb-2 d-block"></i>No outgoing transfers yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<!-- TRANSFER MODAL -->
+<div class="modal fade" id="transferModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-paper-plane me-2"></i>Release Document</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Document: <strong id="modalDocTitle" style="color:#2C2420;">—</strong></p>
+
+        <!-- SVP AUTO-ROUTE PANEL -->
+        <div id="svpAutoPanel" style="display:none;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:6px;padding:10px 12px;font-size:12px;color:#1B5E20;margin-bottom:12px;">
+          <i class="fa fa-route me-1"></i> <strong>SVP Auto-Routing Active</strong><br>
+          Next step: <strong id="svpNextStatus">—</strong><br>
+          Auto-route to: <strong id="svpNextDept">—</strong>
+        </div>
+
+        <div style="background:#FEF9EC;border:1px solid #F5D86A;border-radius:5px;padding:8px 10px;font-size:12px;color:#7A5700;margin-bottom:14px;">
+          <i class="fa fa-circle-info me-1"></i> The receiving office must confirm receipt in their Incoming Documents.
+        </div>
+
+        <!-- Dept dropdown — hidden for SVP -->
+        <div class="mb-3" id="deptSelectPanel">
+          <label class="form-label">Transfer to Department <span class="text-danger">*</span></label>
+          <select class="form-select" id="transferDept">
+            <option value="" disabled selected>Select department...</option>
+            {% for d in departments %}<option value="{{ d.name }}">{{ d.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Remarks <span class="text-muted fw-normal" style="font-size:11px;">(optional)</span></label>
+          <textarea class="form-control" id="transferRemarks" rows="2" placeholder="Transfer notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-gov" id="confirmTransferBtn"><i class="fa fa-paper-plane me-1"></i>Send Transfer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MESSAGE MODAL -->
+<div class="modal fade" id="messageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="messageTitle">Message</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="messageBody" style="margin:0;"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov" data-bs-dismiss="modal">Okay</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CANCEL TRANSFER MODAL -->
+<div class="modal fade" id="cancelTransferModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-xmark me-2"></i>Cancel Transfer</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#FDE8E8;border:1px solid #FACACA;border-radius:5px;padding:8px 10px;font-size:12px;color:#8B0000;margin-bottom:12px;">
+          <i class="fa fa-triangle-exclamation me-1"></i> Are you sure you want to cancel this transfer?
+        </div>
+        <p style="margin:0;"><strong id="cancelDocTitle">—</strong> will remain in your department.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Keep Transfer</button>
+        <button class="btn-gov" id="confirmCancelBtn" style="background:#dc3545;border-color:#dc3545;"><i class="fa fa-xmark me-1"></i>Yes, Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentRecordId = null;
+let currentTransferId = null;
+let transferModal = null;
+let messageModal = null;
+let cancelTransferModal = null;
+
+function showMessage(title, message) {
+  if (messageModal) {
+    document.getElementById('messageTitle').textContent = title;
+    document.getElementById('messageBody').textContent = message;
+    messageModal.show();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize modals
+  const transferModalElement = document.getElementById('transferModal');
+  const messageModalElement = document.getElementById('messageModal');
+  const cancelTransferModalElement = document.getElementById('cancelTransferModal');
+  if (transferModalElement) {
+    transferModal = new bootstrap.Modal(transferModalElement);
+  }
+  if (messageModalElement) {
+    messageModal = new bootstrap.Modal(messageModalElement);
+  }
+  if (cancelTransferModalElement) {
+    cancelTransferModal = new bootstrap.Modal(cancelTransferModalElement);
+  }
+
+  // Handle transfer button clicks
+  let currentIsSvp  = false;
+  let currentAutoDest = '';
+
+  document.querySelectorAll('.transfer-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      currentRecordId = this.dataset.recordId;
+      currentIsSvp    = this.dataset.isSvp === 'true';
+      currentAutoDest = this.dataset.autoDest || '';
+      const autoStatus = this.dataset.autoStatus || '';
+
+      document.getElementById('modalDocTitle').textContent = this.dataset.docId + ' — ' + this.dataset.title;
+      document.getElementById('transferRemarks').value = '';
+
+      const svpPanel  = document.getElementById('svpAutoPanel');
+      const deptPanel = document.getElementById('deptSelectPanel');
+      if (currentIsSvp) {
+        // SVP: hide dept selector, show auto-routing info only
+        if (svpPanel)  { svpPanel.style.display  = 'block'; }
+        if (deptPanel) { deptPanel.style.display = 'none'; }
+        if (document.getElementById('svpNextStatus')) document.getElementById('svpNextStatus').textContent = autoStatus || '(next step)';
+        if (document.getElementById('svpNextDept'))   document.getElementById('svpNextDept').textContent   = currentAutoDest || 'next office in workflow';
+      } else {
+        if (svpPanel)  { svpPanel.style.display  = 'none'; }
+        if (deptPanel) { deptPanel.style.display = 'block'; }
+        document.getElementById('transferDept').value = '';
+      }
+      if (transferModal) transferModal.show();
+    });
+  });
+
+  // Handle cancel transfer button clicks
+  document.querySelectorAll('.cancel-transfer-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      currentTransferId = this.dataset.transferId;
+      document.getElementById('cancelDocTitle').textContent = this.dataset.docTitle;
+      if (cancelTransferModal) {
+        cancelTransferModal.show();
+      }
+    });
+  });
+
+  // Handle confirm cancel transfer button
+  const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+  if (confirmCancelBtn) {
+    confirmCancelBtn.addEventListener('click', async function() {
+      this.disabled = true;
+      this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Cancelling...';
+      try {
+        const res = await fetch(`/documents/cancel-transfer/${currentTransferId}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}
+        });
+        const data = await res.json();
+        if (data.success) {
+          cancelTransferModal.hide();
+          showMessage('Success', data.message);
+          setTimeout(() => { location.reload(); }, 1000);
+        } else {
+          showMessage('Failed', data.message || 'Failed to cancel transfer.');
+        }
+      } catch (err) { showMessage('Error', 'An error occurred.'); }
+      this.disabled = false;
+      this.innerHTML = '<i class="fa fa-xmark me-1"></i>Yes, Cancel';
+    });
+  }
+
+  // Handle confirm transfer button
+  const confirmBtn = document.getElementById('confirmTransferBtn');
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', async function() {
+      // For SVP: backend auto-determines destination, send empty string
+      let toDept = currentIsSvp ? '' : document.getElementById('transferDept').value;
+      const remarks = document.getElementById('transferRemarks').value;
+      if (!currentIsSvp && !toDept) { showMessage('Required', 'Please select a target department.'); return; }
+      this.disabled = true;
+      this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Sending...';
+      try {
+        const res = await fetch(`/documents/transfer/${currentRecordId}`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ to_department: toDept, remarks })
+        });
+        const data = await res.json();
+        if (data.success) {
+          transferModal.hide();
+          showMessage('Success', data.message);
+          setTimeout(() => { location.reload(); }, 1000);
+        } else {
+          showMessage('Transfer Failed', data.message || 'Transfer failed.');
+        }
+      } catch (err) { showMessage('Error', 'An error occurred.'); }
+      this.disabled = false;
+      this.innerHTML = '<i class="fa fa-paper-plane me-1"></i>Send Transfer';
+    });
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.trace-box { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 20px; }
+.trace-result { border-left: 4px solid #b71c1c; padding: 16px 20px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 15px; }
+.timeline { list-style: none; padding: 0; margin: 16px 0 0; position: relative; padding-left: 24px; }
+.timeline::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: #dee2e6; }
+.timeline li { position: relative; padding: 8px 0 8px 18px; font-size: 13px; color: #444; }
+.timeline li::before { content: ''; position: absolute; left: -4px; top: 14px; width: 12px; height: 12px; border-radius: 50%; background: #b71c1c; border: 2px solid white; box-shadow: 0 0 0 2px #b71c1c; }
+.timeline li .ts { font-size: 11px; color: #aaa; display: block; margin-top: 2px; }
+.badge-status { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.s-closed { background: #e2e3e5; color: #383d41; }
+.s-checked { background: #d1e7dd; color: #0f5132; }
+.s-process { background: #fff3cd; color: #664d03; }
+.action-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.ab-create { background: #d1e7dd; color: #0a3622; }
+.ab-transfer { background: #fff3cd; color: #664d03; }
+.ab-received { background: #cfe2ff; color: #084298; }
+.ab-close { background: #e2e3e5; color: #383d41; }
+.ab-edit { background: #e0cffc; color: #3d0a91; }
+</style>
+
+<div class="content">
+  <h1 class="dashboard-title">Trace Document</h1>
+  <p style="color:#666;margin-bottom:20px;">Search for a document by its ID or title to view its complete movement history.</p>
+
+  <div class="trace-box">
+    <form method="GET" action="{{ url_for('main.trace') }}" class="d-flex gap-2">
+      <input type="text" name="q" value="{{ q or '' }}" class="form-control"
+             placeholder="Enter Document ID (e.g. DOC-A1B2C3D4) or title keyword..."
+             style="max-width:480px;" autofocus>
+      <button class="btn btn-danger px-4">
+        <i class="fa fa-search me-1"></i> Search
+      </button>
+      {% if q %}
+      <a href="{{ url_for('main.trace') }}" class="btn btn-outline-secondary">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if q %}
+    {% if not results %}
+      <div class="trace-box text-center" style="color:#999;padding:40px;">
+        <i class="fa fa-search fa-2x mb-3" style="color:#ddd;"></i>
+        <p>No documents found matching "<strong>{{ q }}</strong>".</p>
+      </div>
+    {% else %}
+      <p style="color:#666;font-size:13px;margin-bottom:12px;">
+        Found <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }} matching "<strong>{{ q }}</strong>"
+      </p>
+
+      {% for r in results %}
+      <div class="trace-result">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1" style="font-size:16px;">
+              <strong style="color:#b71c1c;">{{ r.document_code }}</strong> — {{ r.title }}
+            </h5>
+            <div class="d-flex gap-3 flex-wrap" style="font-size:13px;color:#555;">
+              <span><i class="fa fa-file me-1"></i>{{ r.doc_type }}</span>
+              <span><i class="fa fa-building me-1"></i>{{ r.department }}</span>
+              <span><i class="fa fa-calendar me-1"></i>{{ r.date_received.strftime('%b %d, %Y') }}</span>
+              {% if r.amount %}
+              <span><i class="fa fa-peso-sign me-1"></i>₱ {{ "{:,.2f}".format(r.amount) }}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            {% if r.status == 'Closed' %}
+              <span class="badge-status s-closed">Closed</span>
+            {% elif r.status == 'With Checked' %}
+              <span class="badge-status s-checked">Completed</span>
+            {% else %}
+              <span class="badge-status s-process">{{ r.status }}</span>
+            {% endif %}
+            <a href="{{ url_for('main.document_detail', record_id=r.id) }}" class="btn btn-sm btn-outline-secondary">View Detail</a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

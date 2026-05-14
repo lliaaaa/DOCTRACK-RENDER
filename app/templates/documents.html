@@ -1,0 +1,67 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div class="d-flex justify-content-between align-items-start mb-4" style="border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <div>
+      <h1 class="dashboard-title">All Documents</h1>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Document registry for <strong>{{ current_user.department }}</strong></div>
+    </div>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('main.add_document') }}" class="btn-gov"><i class="fa fa-file-circle-plus me-1"></i>New Document</a>
+    {% endif %}
+  </div>
+
+  <!-- FILTERS -->
+  <div class="gov-card" style="padding:14px 18px;margin-bottom:16px;">
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
+      <div style="flex:1;min-width:200px;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Search by Doc ID or title..." class="form-control" style="font-size:13px;">
+      </div>
+      <select name="status" class="form-select" style="max-width:180px;font-size:13px;">
+        <option value="">All Statuses</option>
+        <option value="inprocess" {% if status_filter == 'inprocess' %}selected{% endif %}>In Process</option>
+        <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Closed</option>
+      </select>
+      <button type="submit" class="btn-gov"><i class="fa fa-magnifying-glass me-1"></i>Search</button>
+      {% if q or status_filter %}
+      <a href="{{ url_for('main.documents') }}" class="btn-gov-outline"><i class="fa fa-xmark me-1"></i>Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="gov-card" style="padding:0;">
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Doc ID</th><th>Title</th><th>Type</th><th>Priority</th>
+          <th>Department</th><th>Status</th><th>Date In</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td><span class="doc-id">{{ record.document_code }}</span></td>
+          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ record.title }}</td>
+          <td style="font-size:12px;">{{ record.doc_type }}</td>
+          <td><span class="p-{{ (record.priority or 'normal')|lower }}">{{ record.priority or 'Normal' }}</span></td>
+          <td style="font-size:12px;">{{ record.department }}</td>
+          <td>
+            {% if record.status == 'Closed' %}<span class="status-badge s-closed">Closed</span>
+            {% else %}<span class="status-badge s-process">{{ record.status }}</span>{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--muted);">{{ record.created_at.strftime('%b %d, %Y') if record.created_at else '-' }}</td>
+          <td><a href="{{ url_for('main.document_detail', record_id=record.id) }}" class="btn-sm-action ba-view"><i class="fa fa-eye me-1"></i>View</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px;font-size:13px;"><i class="fa fa-folder-open fa-lg mb-2 d-block"></i>No documents found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div style="padding:10px 14px;font-size:11px;color:var(--muted);border-top:1px solid #F0EDE8;">
+      Showing {{ records|length }} document{{ 's' if records|length != 1 else '' }}
+    </div>
+  </div>
+</div>
+{% endblock %}

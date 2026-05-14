@@ -1,0 +1,87 @@
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #6B0000 0%, #a01010 50%, #6B0000 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Sans', 'Arial', sans-serif;
+    padding: 20px;
+}
+.login-wrap { width: 100%; max-width: 420px; }
+.login-header { text-align: center; margin-bottom: 28px; }
+.login-seal {
+    width: 72px; height: 72px; background: rgba(255,255,255,.15); border-radius: 50%; border: 2px solid rgba(255,255,255,.3);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 28px; color: white; margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+}
+.login-header h1 {
+    color: #F5F0E8; font-size: 22px; font-weight: 700;
+    font-family: 'Georgia', serif; letter-spacing: .3px;
+}
+.login-header p { color: rgba(245,240,232,.6); font-size: 12px; margin-top: 5px; text-transform: uppercase; letter-spacing: .8px; }
+.login-card {
+    background: white; border-radius: 10px;
+    padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    border-top: 3px solid #b71c1c;
+}
+.login-card .form-group { margin-bottom: 18px; }
+.login-card label { font-size: 12px; font-weight: 600; color: #3C3028; display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .5px; }
+.login-card input {
+    width: 100%; padding: 10px 13px; border: 1px solid #D4CDC4;
+    border-radius: 5px; font-size: 13px; color: #2C2420;
+    transition: border-color .15s, box-shadow .15s;
+}
+.login-card input:focus { outline: none; border-color: #b71c1c; box-shadow: 0 0 0 3px rgba(139,0,0,.1); }
+.login-btn {
+    width: 100%; background: linear-gradient(120deg, #8f0707 0%, #b71c1c 100%);
+    color: white; border: none; padding: 12px; border-radius: 5px;
+    font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px;
+    letter-spacing: .5px; text-transform: uppercase;
+    transition: opacity .15s;
+}
+.login-btn:hover { opacity: .92; }
+.alert { font-size: 12px; padding: 10px 12px; border-radius: 5px; margin-bottom: 16px; border-left: 4px solid; }
+.alert-danger { background: #FDE8E8; border-left-color: #b71c1c; color: #5C0000; }
+.alert-success { background: #D1EDD8; border-left-color: #198754; color: #0F3A1F; }
+.alert-warning { background: #FEF3C2; border-left-color: #F5A623; color: #5C3A00; }
+.login-footer { text-align: center; margin-top: 20px; color: rgba(245,240,232,.4); font-size: 11px; }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<div class="login-wrap">
+    <div class="login-header">
+        <div class="login-seal"><i class="fas fa-landmark"></i></div>
+        <h1>Document Tracking System</h1>
+        <p>Municipality of Unisan · Region IV-A CALABARZON</p>
+    </div>
+
+    <div class="login-card">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('auth.login') }}">
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" name="email" required placeholder="Enter your email">
+            </div>
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" name="password" required placeholder="Enter your password">
+            </div>
+            <button type="submit" class="login-btn">Sign In</button>
+        </form>
+    </div>
+
+    <div class="login-footer">
+        Republic of the Philippines · Official Government System<br>
+        Unauthorized access is strictly prohibited.
+    </div>
+</div>

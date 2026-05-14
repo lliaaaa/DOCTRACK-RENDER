@@ -1,0 +1,207 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.tier-stat { border-radius:8px; padding:14px 16px; display:flex; align-items:center; gap:12px; border:1px solid rgba(0,0,0,.07); }
+.tier-stat .ts-icon { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.tier-stat .ts-val { font-size:22px; font-weight:800; line-height:1; font-family:var(--serif); }
+.tier-stat .ts-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; opacity:.75; margin-top:2px; }
+.notif-item { padding:9px 14px; border-bottom:1px solid #F0EBE3; cursor:pointer; transition:background .15s; }
+.notif-item:hover { background:#FAFAF8; }
+.mini-bar { height:4px; border-radius:2px; background:#e0e0e0; margin-top:4px; overflow:hidden; }
+.mini-fill { height:4px; border-radius:2px; }
+</style>
+
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Dashboard</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+      <i class="fa fa-building me-1"></i>{{ current_user.department }}
+      {% if pending_incoming > 0 %}
+      &nbsp;·&nbsp;<a href="{{ url_for('main.incoming_documents') }}" style="color:#1565C0;font-weight:700;text-decoration:none;">
+        <i class="fa fa-inbox me-1"></i>{{ pending_incoming }} pending transfer{{ 's' if pending_incoming != 1 else '' }}
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+      <div class="stat-card">
+        <div class="stat-ic"><i class="fa-solid fa-file-lines"></i></div>
+        <div><div class="stat-lbl">Total Documents</div><div class="stat-val">{{ stats.total_documents }}</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="stat-card sp">
+        <div class="stat-ic"><i class="fa-solid fa-gears"></i></div>
+        <div><div class="stat-lbl">In Process</div><div class="stat-val">{{ stats.in_process }}</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="stat-card sc">
+        <div class="stat-ic"><i class="fa-solid fa-box-archive"></i></div>
+        <div><div class="stat-lbl">Closed</div><div class="stat-val">{{ stats.closed }}</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="stat-card" style="border-left-color:#F44336;">
+        <div class="stat-ic" style="background:#FFEBEE;color:#C62828;"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div><div class="stat-lbl">Critical / Overdue</div><div class="stat-val" style="color:#C62828;">{{ critical_docs|length }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SLA TIER ROW -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+      <div class="tier-stat" style="background:#E3F2FD;">
+        <div class="ts-icon" style="background:#2196F3;color:white;"><i class="fa fa-check"></i></div>
+        <div><div class="ts-val" style="color:#1565C0;">{{ tier_counts.get('blue',0) }}</div><div class="ts-lbl" style="color:#1565C0;">On Track</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="tier-stat" style="background:#E8F5E9;">
+        <div class="ts-icon" style="background:#4CAF50;color:white;"><i class="fa fa-circle-half-stroke"></i></div>
+        <div><div class="ts-val" style="color:#2E7D32;">{{ tier_counts.get('green',0) }}</div><div class="ts-lbl" style="color:#2E7D32;">In Progress</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="tier-stat" style="background:#FFF8E1;">
+        <div class="ts-icon" style="background:#FF9800;color:white;"><i class="fa fa-exclamation"></i></div>
+        <div><div class="ts-val" style="color:#E65100;">{{ tier_counts.get('yellow',0) }}</div><div class="ts-lbl" style="color:#E65100;">Urgent</div></div>
+      </div>
+    </div>
+    <div class="col-6 col-xl-3">
+      <div class="tier-stat" style="background:#FFEBEE;">
+        <div class="ts-icon" style="background:#F44336;color:white;"><i class="fa fa-fire"></i></div>
+        <div><div class="ts-val" style="color:#C62828;">{{ tier_counts.get('red',0) }}</div><div class="ts-lbl" style="color:#C62828;">Critical</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- RECENT DOCS -->
+    <div class="col-lg-8">
+      <div class="gov-card">
+        <div class="gov-card-header">
+          <div class="ci"><i class="fa-solid fa-clock-rotate-left"></i></div>
+          <h3>Recent Documents</h3>
+          <a href="{{ url_for('main.documents') }}" style="margin-left:auto;font-size:11px;color:var(--gov-red);text-decoration:none;font-weight:600;">View All <i class="fa fa-arrow-right fa-xs"></i></a>
+        </div>
+        <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Doc ID</th><th>Title</th><th>Status</th><th>SLA</th><th>Date In</th></tr></thead>
+          <tbody>
+            {% for r in records %}
+            {% set sla = r.sla_info() %}
+            {% set tc = {'blue':'#2196F3','green':'#4CAF50','yellow':'#FF9800','red':'#F44336'} %}
+            <tr style="cursor:pointer;{% if sla.tier == 'red' %}background:#FFF5F5;{% elif sla.tier == 'yellow' %}background:#FFFDF0;{% endif %}" onclick="window.location='{{ url_for('main.document_detail', record_id=r.id) }}'">
+              <td><span class="doc-id">{{ r.document_code }}</span></td>
+              <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.title }}</td>
+              <td>
+                {% if r.status == 'Closed' %}<span class="status-badge s-closed">Closed</span>
+                {% else %}<span class="status-badge s-process">{{ r.status }}</span>{% endif %}
+              </td>
+              <td style="min-width:90px;">
+                {% if r.status not in ['Closed','With Checked and Closed'] %}
+                <span style="font-size:9.5px;font-weight:700;color:{{ tc[sla.tier] }};">{{ sla.tier_label }}</span>
+                <div class="mini-bar"><div class="mini-fill" style="width:{{ sla.pct }}%;background:{{ tc[sla.tier] }};"></div></div>
+                {% else %}—{% endif %}
+              </td>
+              <td style="font-size:11px;color:var(--muted);">{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px;font-size:13px;">No documents found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <!-- CRITICAL DOCS PANEL -->
+      {% if critical_docs %}
+      <div class="gov-card" style="margin-top:16px;border-left:4px solid #F44336;">
+        <div class="gov-card-header" style="background:#FFEBEE;margin:-1px -1px 0;padding:10px 14px;border-radius:7px 7px 0 0;">
+          <div class="ci" style="background:#F44336;"><i class="fa fa-fire"></i></div>
+          <h3 style="color:#C62828;">Overdue / Critical Documents</h3>
+          <span class="cc" style="background:#F44336;color:white;">{{ critical_docs|length }}</span>
+        </div>
+        {% for r in critical_docs[:5] %}
+        {% set sla = r.sla_info() %}
+        <div class="notif-item" onclick="window.location='{{ url_for('main.document_detail', record_id=r.id) }}'">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-family:monospace;font-size:11px;color:#8B1A1A;font-weight:700;">{{ r.document_code }}</span>
+            <span style="font-size:10px;font-weight:700;color:#C62828;">{{ sla.pct }}% elapsed</span>
+          </div>
+          <div style="font-size:12px;font-weight:500;color:#2C2420;margin-top:2px;">{{ r.title }}</div>
+          <div class="mini-bar"><div class="mini-fill" style="width:{{ sla.pct }}%;background:#F44336;"></div></div>
+          <div style="font-size:10px;color:#888;margin-top:2px;">{{ r.department }} · {{ sla.hours_left }}h remaining</div>
+        </div>
+        {% endfor %}
+        {% if critical_docs|length > 5 %}
+        <div style="padding:8px 14px;font-size:11px;color:var(--muted);text-align:center;">
+          +{{ critical_docs|length - 5 }} more critical document{{ 's' if critical_docs|length - 5 != 1 else '' }}
+          — <a href="{{ url_for('main.documents') }}" style="color:var(--gov-red);">View all</a>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div class="col-lg-4">
+      <!-- STATUS BREAKDOWN -->
+      <div class="gov-card" style="margin-bottom:16px;">
+        <div class="gov-card-header">
+          <div class="ci"><i class="fa-solid fa-chart-pie"></i></div>
+          <h3>Status Breakdown</h3>
+        </div>
+        {% for status_label, count in charts_combined %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0EDE8;">
+          <div style="font-size:12px;font-weight:500;color:#3C3028;">
+            {% if status_label == 'Closed' %}<i class="fa fa-lock fa-xs me-2" style="color:#5C5248;"></i>
+            {% elif status_label == 'Assigned' %}<i class="fa fa-user fa-xs me-2" style="color:#7A5700;"></i>
+            {% elif status_label == 'Pulled Out' %}<i class="fa fa-arrow-rotate-left fa-xs me-2" style="color:#8B0000;"></i>
+            {% else %}<i class="fa fa-circle-half-stroke fa-xs me-2" style="color:#7A5700;"></i>{% endif %}
+            {{ status_label }}
+          </div>
+          <span style="background:#F0EDE8;color:#2C2420;font-size:12px;font-weight:700;padding:2px 9px;border-radius:10px;">{{ count }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- SLA LEGEND -->
+      <div class="gov-card">
+        <div class="gov-card-header">
+          <div class="ci"><i class="fa-solid fa-clock"></i></div>
+          <h3>Citizen Charter SLA</h3>
+        </div>
+        <div style="font-size:12px;color:#3C3028;padding:4px 0;">
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F0EDE8;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#2196F3;flex-shrink:0;"></span>
+            <span><strong>Blue</strong> — 0–24% elapsed · On Track</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F0EDE8;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#4CAF50;flex-shrink:0;"></span>
+            <span><strong>Green</strong> — 25–49% elapsed · In Progress</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #F0EDE8;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#FF9800;flex-shrink:0;"></span>
+            <span><strong>Yellow</strong> — 50–74% elapsed · Urgent</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 0;">
+            <span style="width:12px;height:12px;border-radius:50%;background:#F44336;flex-shrink:0;"></span>
+            <span><strong>Red</strong> — 75–100% elapsed · Critical/Overdue</span>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px;background:#F5F0E8;border-radius:6px;font-size:11px;color:#5C5248;">
+          <i class="fa fa-circle-info me-1"></i>
+          <strong>Simple</strong> = 3 days · <strong>Complex</strong> = 7 days · <strong>Highly Technical</strong> = 20 days
+          <br><a href="{{ url_for('main.charter_settings') }}" style="color:var(--gov-red);font-weight:600;">Configure SLA targets →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

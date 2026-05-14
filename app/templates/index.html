@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DTS – Municipality of Unisan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+:root {
+    --gov-red: #b71c1c;
+    --gov-red-dark: #8f0707;
+    --gov-red-mid: #c62828;
+        --sidebar-width: 262px;
+    --sidebar-col: 64px;
+    --hdr-h: 60px;
+    --bg: #F0EDE8;
+    --bg-sidebar: #5c0a0a;
+    --border: #E2DDD6;
+    --muted: #8A7F74;
+    --serif: 'Source Serif 4', Georgia, serif;
+    --sans: 'IBM Plex Sans', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: #1C1410; }
+
+/* SIDEBAR */
+.sidebar {
+    width: var(--sidebar-width); background: var(--bg-sidebar);
+    height: 100vh; position: fixed; left: 0; top: 0;
+    transition: width .28s ease; overflow: hidden; z-index: 1030;
+    display: flex; flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,.08);
+}
+.sidebar.collapsed { width: var(--sidebar-col); }
+.sb-brand {
+    padding: 16px 14px 12px; border-bottom: 1px solid rgba(197,160,40,.12);
+    display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.sb-icon { width: 32px; height: 32px; flex-shrink: 0; background: rgba(255,255,255,.15); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; border: 1px solid rgba(255,255,255,.2); }
+.sb-title { font-family: var(--serif); color: #F5F0E8; font-size: 13px; font-weight: 700; white-space: nowrap; line-height: 1.2; }
+.sb-sub { color: rgba(255,255,255,.65); font-size: 9.5px; white-space: nowrap; text-transform: uppercase; letter-spacing: .6px; margin-top: 1px; }
+.sidebar.collapsed .sb-brand .sb-title, .sidebar.collapsed .sb-brand .sb-sub { display: none; }
+.sb-user { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.05); flex-shrink: 0; }
+.sb-user .un { color: #F5F0E8; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sb-user .ud { color: rgba(255,255,255,.7); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.sb-user .ur { display: inline-block; background: #dc2626; color: #5c0a0a; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; text-transform: uppercase; letter-spacing: .4px; margin-top: 3px; }
+.sidebar.collapsed .sb-user { display: none; }
+.sb-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 6px 0; }
+.sb-nav::-webkit-scrollbar { width: 3px; }
+.sb-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
+.nav-sec { padding: 10px 14px 3px; font-size: 9.5px; font-weight: 700; letter-spacing: 1.1px; color: rgba(255,200,100,.45); text-transform: uppercase; white-space: nowrap; overflow: hidden; }
+.sidebar.collapsed .nav-sec { opacity: 0; }
+.sidebar a {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+    color: rgba(245,240,232,.72); text-decoration: none; white-space: nowrap;
+    overflow: hidden; transition: background .15s, color .15s; font-size: 13px;
+}
+.sidebar a:hover { background: rgba(255,255,255,.06); color: #F5F0E8; }
+.sidebar a.active { background: rgba(139,0,0,.42); color: #F5F0E8; font-weight: 600; border-right: 3px solid #ff6b6b; }
+.sidebar a i { min-width: 20px; text-align: center; font-size: 13px; flex-shrink: 0; color: rgba(255,255,255,.6); }
+.sidebar a:hover i, .sidebar a.active i { color: white; }
+.sidebar a .nl { overflow: hidden; text-overflow: ellipsis; }
+.sidebar.collapsed a .nl { display: none; }
+.sidebar a .nbadge { background: var(--gov-red); color: white; border-radius: 10px; font-size: 10px; padding: 1px 6px; margin-left: auto; font-weight: 700; }
+.sidebar.collapsed .nbadge { display: none; }
+.sb-foot { padding: 10px 14px; border-top: 1px solid rgba(255,255,255,.06); flex-shrink: 0; }
+.sb-foot a { display: flex; align-items: center; gap: 9px; color: rgba(245,240,232,.45); font-size: 12px; text-decoration: none; padding: 5px 0; transition: color .15s; cursor: pointer; }
+.sb-foot a:hover { color: #F5F0E8; }
+.sb-foot a i { width: 20px; text-align: center; font-size: 13px; }
+.sidebar.collapsed .sb-foot a span { display: none; }
+
+/* HEADER */
+.main-header {
+    height: var(--hdr-h); background: linear-gradient(120deg, var(--gov-red-dark) 0%, var(--gov-red) 100%);
+    color: white; display: flex; align-items: center; padding: 0 18px; gap: 12px;
+    position: fixed; top: 0; left: var(--sidebar-width); right: 0;
+    transition: left .28s ease; z-index: 1020;
+    box-shadow: 0 2px 8px rgba(0,0,0,.22); border-bottom: 2px solid rgba(255,200,150,.5);
+}
+.main-header.collapsed { left: var(--sidebar-col); }
+.hdr-toggle { background: none; border: none; color: white; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 4px; transition: background .15s; font-size: 15px; flex-shrink: 0; }
+.hdr-toggle:hover { background: rgba(255,255,255,.15); }
+.hdr-title { font-family: var(--serif); font-size: 15px; font-weight: 600; flex: 1; letter-spacing: .2px; }
+.hdr-title small { display: block; font-family: var(--sans); font-size: 9.5px; font-weight: 400; opacity: .7; text-transform: uppercase; letter-spacing: .5px; margin-top: 1px; }
+.hdr-clock { font-size: 11px; opacity: .8; text-align: right; line-height: 1.5; display: none; }
+@media(min-width:768px) { .hdr-clock { display: block; } }
+.hdr-user { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: white; padding: 5px 11px; border-radius: 5px; display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; text-decoration: none; transition: background .15s; white-space: nowrap; }
+.hdr-user:hover { background: rgba(255,255,255,.2); color: white; }
+
+/* CONTENT */
+#mainContent { margin-left: var(--sidebar-width); padding-top: var(--hdr-h); transition: margin-left .28s ease; min-height: 100vh; }
+#mainContent.collapsed { margin-left: var(--sidebar-col); }
+.content { padding: 26px 24px; }
+.flash-container { padding: 10px 24px 0; }
+
+/* PAGE TITLE */
+.dashboard-title, .page-title { font-family: var(--serif); font-size: 21px; font-weight: 700; color: #1C1410; letter-spacing: -.2px; }
+
+/* STATUS / PRIORITY BADGES */
+.status-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; letter-spacing: .2px; white-space: nowrap; }
+.s-closed { background: #E8E4DF; color: #5C5248; border: 1px solid #C8C0B8; }
+.s-completed { background: #D1EDD8; color: #1A5C2E; border: 1px solid #9FCFAC; }
+.s-process { background: #FEF3C2; color: #7A5700; border: 1px solid #F5D86A; }
+.p-urgent { background: #b71c1c; color: white; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
+.p-normal { background: #1A3A6B; color: white; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
+.p-routine { background: #1A5C2E; color: white; font-size: 10px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }
+
+/* CARDS */
+.gov-card { background: white; border-radius: 8px; padding: 20px; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 18px; }
+.gov-card-header { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid #EDE8E0; }
+.gov-card-header .ci { width: 28px; height: 28px; border-radius: 5px; display: flex; align-items: center; justify-content: center; background: #8f0707; color: white; font-size: 12px; flex-shrink: 0; }
+.gov-card-header h3 { font-family: var(--serif); font-size: 14px; font-weight: 700; color: #7a0b0b; margin: 0; }
+.gov-card-header .cc { margin-left: auto; background: var(--gov-red); color: white; border-radius: 12px; font-size: 10px; font-weight: 700; padding: 2px 7px; }
+
+/* TABLES */
+table { width: 100%; background: white; border-radius: 8px; border-collapse: collapse; box-shadow: 0 1px 4px rgba(0,0,0,.06); overflow: hidden; border: 1px solid var(--border); }
+th { background: #8f0707; color: rgba(245,240,232,.85); padding: 10px 13px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; }
+td { padding: 9px 13px; font-size: 13px; border-bottom: 1px solid #F0EDE8; vertical-align: middle; color: #2C2420; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FBF8F5; }
+
+/* DOC ID */
+.doc-id { font-family: monospace; font-size: 11.5px; font-weight: 700; color: var(--gov-red); background: #FEE8E8; padding: 2px 7px; border-radius: 3px; white-space: nowrap; border: 1px solid #FACACA; }
+
+/* STAT CARDS */
+.stat-card { background: white; border-radius: 8px; padding: 16px 18px; border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.06); display: flex; align-items: center; gap: 14px; position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--gov-red); }
+.stat-card.sc::before { background: #5C5248; }
+.stat-card.sd::before { background: #198754; }
+.stat-card.sp::before { background: #F5A623; }
+.stat-ic { width: 40px; height: 40px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 17px; flex-shrink: 0; background: #F0EDE8; color: var(--gov-red); }
+.stat-card.sc .stat-ic { color: #5C5248; } .stat-card.sd .stat-ic { color: #198754; } .stat-card.sp .stat-ic { color: #F5A623; }
+.stat-lbl { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+.stat-val { font-family: var(--serif); font-size: 25px; font-weight: 700; color: #1C1410; line-height: 1.1; }
+
+/* BUTTONS */
+.btn-gov { background: var(--gov-red); color: white; border: none; padding: 7px 15px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .15s; text-decoration: none; }
+.btn-gov:hover { background: var(--gov-red-dark); color: white; }
+.btn-gov-outline { background: transparent; color: var(--gov-red); border: 1.5px solid var(--gov-red); padding: 6px 13px; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all .15s; text-decoration: none; }
+.btn-gov-outline:hover { background: var(--gov-red); color: white; }
+.btn-sm-action { padding: 4px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-decoration: none; transition: opacity .15s; }
+.btn-sm-action:hover { opacity: .85; }
+.ba-view { background: #1A3A6B; color: white; }
+.ba-edit { background: #1A5C2E; color: white; }
+.ba-transfer { background: #7A5700; color: white; }
+.ba-receive { background: #198754; color: white; }
+.ba-close { background: #4A403A; color: white; }
+.ba-delete { background: #b71c1c; color: white; }
+
+/* MODAL */
+.modal-header { background: #8f0707; color: #F5F0E8; border-bottom: 2px solid rgba(255,200,150,.5); padding: 13px 16px; }
+.modal-header .modal-title { font-family: var(--serif); font-size: 15px; font-weight: 700; }
+.modal-header .btn-close { filter: invert(1) opacity(.65); }
+.modal-body { padding: 16px; }
+.modal-footer { border-top: 1px solid #EDE8E0; padding: 11px 16px; }
+.form-label { font-size: 12px; font-weight: 600; color: #3C3028; margin-bottom: 4px; }
+.form-control, .form-select { font-size: 13px; border: 1px solid #D4CDC4; border-radius: 5px; color: #2C2420; }
+.form-control:focus, .form-select:focus { border-color: var(--gov-red); box-shadow: 0 0 0 3px rgba(139,0,0,.1); outline: none; }
+.form-control[readonly] { background: #F5F0E8; color: #7A7068; }
+
+/* SECTION LABEL */
+.sec-label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .9px; color: #6B5C50; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid #EDE8E0; }
+
+/* ALERT */
+.alert { font-size: 13px; border-radius: 6px; font-weight: 500; border-left: 4px solid; }
+.alert-success { border-left-color: #198754; } .alert-danger { border-left-color: #dc3545; }
+.alert-warning { border-left-color: #fd7e14; } .alert-info { border-left-color: #0dcaf0; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+    <div class="sb-brand">
+        <div class="sb-icon"><i class="fa-solid fa-landmark"></i></div>
+        <div>
+            <div class="sb-title">Municipality of Unisan</div>
+            <div class="sb-sub">Document Tracking System</div>
+        </div>
+    </div>
+    <div class="sb-user">
+        <div class="un"><i class="fa fa-user fa-xs me-1" style="opacity:.4;"></i>{{ current_user.full_name }}</div>
+        <div class="ud">{{ current_user.department }}</div>
+        {% if current_user.role == 'admin' %}<span class="ur"><i class="fa fa-shield-halved fa-xs me-1"></i>Admin</span>{% endif %}
+    </div>
+    <div class="sb-nav">
+        <a href="{{ url_for('main.dashboard') }}"><i class="fa-solid fa-gauge-high"></i><span class="nl">Dashboard</span></a>
+        <div class="nav-sec">Document Menu</div>
+        <a href="{{ url_for('main.add_document') }}"><i class="fa-solid fa-file-circle-plus"></i><span class="nl">New </span></a>
+        <a href="{{ url_for('main.processing_documents') }}"><i class="fa-solid fa-folder-open"></i><span class="nl">Open</span></a>
+        <a href="{{ url_for('main.assigned_documents') }}"><i class="fa-solid fa-user-check"></i><span class="nl">Assigned</span></a>
+        <a href="{{ url_for('main.archived_documents') }}"><i class="fa-solid fa-circle-check"></i><span class="nl">Closed</span></a>
+        <a href="{{ url_for('main.incoming_documents') }}" id="incomingLink"><i class="fa-solid fa-download"></i><span class="nl">Receive</span><span class="nbadge" id="pendingBadge" style="display:none;"></span></a>
+        <a href="{{ url_for('main.outgoing_documents') }}"><i class="fa-solid fa-share-from-square"></i><span class="nl">Release</span></a>     
+        <a href="{{ url_for('main.trace') }}"><i class="fa-solid fa-magnifying-glass-location"></i><span class="nl">Trace</span></a>
+        {% if current_user.role == 'admin' %}
+        <div class="nav-sec">Analytics</div>
+        <a href="{{ url_for('main.reports') }}"><i class="fa-solid fa-chart-pie"></i><span class="nl">Reports</span></a>
+        <div class="nav-sec">Administration</div>
+        <a href="{{ url_for('main.users') }}"><i class="fa-solid fa-users"></i><span class="nl">Staff Members</span></a>
+        <a href="{{ url_for('main.office_settings') }}"><i class="fa-solid fa-gear"></i><span class="nl">Office Settings</span></a>
+        <a href="{{ url_for('main.charter_settings') }}"><i class="fa-solid fa-clock-rotate-left"></i><span class="nl">Citizen Charter SLA</span></a>
+        <a href="{{ url_for('main.activity_logs') }}"><i class="fa-solid fa-clipboard-list"></i><span class="nl">Activity Logs</span></a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- HEADER -->
+<div class="main-header" id="mainHeader">
+    <button class="hdr-toggle" onclick="toggleSidebar()"><i class="fa fa-bars"></i></button>
+    <div class="hdr-title">
+        Document Tracking System
+        <small>Republic of the Philippines · Region IV-A CALABARZON · Municipality of Unisan</small>
+    </div>
+    <div class="hdr-clock">
+        <div id="clockDate" style="font-size:9.5px;opacity:.8;text-transform:uppercase;letter-spacing:.5px;"></div>
+        <div id="clockTime" style="font-size:12px;font-weight:600;font-family:var(--serif);"></div>
+    </div>
+    <!-- NOTIFICATION BELL -->
+    <div class="dropdown ms-2" style="position:relative;">
+      <button class="hdr-user" id="notifBellBtn" data-bs-toggle="dropdown" style="background:none;border:none;cursor:pointer;position:relative;padding:6px 10px;">
+        <i class="fa-solid fa-bell" style="font-size:15px;"></i>
+        <span id="notifBadge" style="display:none;position:absolute;top:2px;right:4px;background:#F44336;color:white;border-radius:50%;font-size:9px;font-weight:700;width:16px;height:16px;line-height:16px;text-align:center;"></span>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end p-0" id="notifDropdown" style="min-width:320px;max-height:380px;overflow-y:auto;font-size:13px;">
+        <div style="padding:10px 14px;font-weight:700;font-size:12px;border-bottom:1px solid #eee;color:#3C3028;">
+          <i class="fa fa-bell me-1"></i> Notifications
+        </div>
+        <div id="notifList" style="padding:10px 14px;color:#888;font-size:12px;">Loading...</div>
+      </div>
+    </div>
+    <div class="dropdown ms-2">
+        <a class="hdr-user dropdown-toggle" data-bs-toggle="dropdown" style="cursor:pointer;">
+            <i class="fa-solid fa-circle-user" style="font-size:14px;"></i>
+            <span>{{ current_user.full_name }}</span>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" style="font-size:13px;min-width:200px;">
+            <li><span class="dropdown-item-text text-muted small">{{ current_user.department }}</span></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" data-bs-toggle="modal" data-bs-target="#changePasswordModal" style="cursor:pointer;"><i class="fa fa-key me-2"></i>Change Password</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="fa fa-right-from-bracket me-2"></i>Sign Out</a></li>
+        </ul>
+    </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="mainContent">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show mt-2" role="alert">
+            <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'danger' %}fa-circle-xmark{% elif category == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %} me-2"></i>{{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Sidebar state persistence
+function toggleSidebar() {
+    ['sidebar','mainHeader','mainContent'].forEach(id => document.getElementById(id).classList.toggle('collapsed'));
+    const isCollapsed = document.getElementById('sidebar').classList.contains('collapsed');
+    localStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+}
+
+// Restore sidebar state on page load
+window.addEventListener('DOMContentLoaded', function() {
+    const sidebarCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (sidebarCollapsed) {
+        ['sidebar','mainHeader','mainContent'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('collapsed');
+        });
+    }
+});
+
+document.querySelectorAll('.sidebar a[href]').forEach(a => {
+    try { if (window.location.pathname === new URL(a.href).pathname) a.classList.add('active'); } catch(e) {}
+});
+function updateClock() {
+    const now = new Date();
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const d = document.getElementById('clockDate');
+    const t = document.getElementById('clockTime');
+    if (d) d.textContent = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+    if (t) {
+        let h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(), ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        t.textContent = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} ${ampm}`;
+    }
+}
+updateClock(); setInterval(updateClock, 1000);
+</script>
+
+<script>
+const TIER_COLOR = { blue:'#2196F3', green:'#4CAF50', yellow:'#FF9800', red:'#F44336' };
+const TIER_BG    = { blue:'#E3F2FD', green:'#E8F5E9', yellow:'#FFF8E1', red:'#FFEBEE' };
+
+async function pollNotifications() {
+  try {
+    const res  = await fetch('/api/notifications');
+    const data = await res.json();
+    // Sidebar incoming badge
+    const badge = document.getElementById('pendingBadge');
+    if (badge) {
+      if (data.pending_incoming > 0) { badge.textContent = data.pending_incoming; badge.style.display='inline'; }
+      else badge.style.display = 'none';
+    }
+    // Bell badge
+    const bell = document.getElementById('notifBadge');
+    const total = (data.alerts||[]).length + (data.pending_incoming||0);
+    if (bell) {
+      if (total > 0) { bell.textContent = total > 9 ? '9+' : total; bell.style.display='block'; }
+      else bell.style.display = 'none';
+    }
+    // Notification dropdown
+    const list = document.getElementById('notifList');
+    if (!list) return;
+    let html = '';
+    if (data.pending_incoming > 0) {
+      html += `<a href="/incoming" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:#E3F2FD;">
+        <span style="font-weight:700;color:#1565C0;"><i class="fa fa-download me-1"></i>${data.pending_incoming} pending transfer${data.pending_incoming>1?'s':''}</span>
+        <span style="display:block;font-size:11px;color:#666;margin-top:1px;">Awaiting receipt in your office</span></a>`;
+    }
+    (data.alerts||[]).forEach(a => {
+      const c = TIER_COLOR[a.tier]||'#999'; const bg = TIER_BG[a.tier]||'#fafafa';
+      const elapsed = a.elapsed_minutes >= 60
+        ? `${(a.elapsed_minutes/60).toFixed(1)}h`
+        : `${a.elapsed_minutes}m`;
+      html += `<a href="/documents/${a.id}" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:${bg};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;font-size:12px;color:#222;">${a.code}</span>
+          <span style="font-size:10px;font-weight:700;color:white;background:${c};border-radius:4px;padding:1px 6px;">${a.tier_label.toUpperCase()}</span>
+        </div>
+        <div style="font-size:11px;color:#555;margin-top:2px;">${a.title.length>40?a.title.slice(0,40)+'…':a.title}</div>
+        <div style="margin-top:4px;background:#e0e0e0;border-radius:4px;height:4px;overflow:hidden;">
+          <div style="height:4px;width:${a.pct}%;background:${c};border-radius:4px;"></div>
+        </div>
+        <div style="font-size:10px;color:#888;margin-top:2px;">${elapsed} elapsed · ${a.hours_left}h remaining</div>
+      </a>`;
+    });
+    if (!html) html = '<div style="padding:12px;color:#aaa;text-align:center;font-size:12px;">No urgent notifications</div>';
+    list.innerHTML = html;
+  } catch(e) { console.warn('Notification poll failed', e); }
+}
+pollNotifications();
+setInterval(pollNotifications, 30000); // Poll every 30s
+</script>
+</body>
+</html>

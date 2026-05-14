@@ -1,0 +1,35 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Closed Documents</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Archived documents visible to <strong>{{ current_user.department }}</strong></div>
+  </div>
+  <div class="gov-card" style="padding:0;">
+    <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr><th>Doc ID</th><th>Title</th><th>Type</th><th>Priority</th><th>Remarks</th><th>Closed On</th></tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td><span class="doc-id">{{ r.document_code }}</span></td>
+          <td style="font-weight:500;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.title }}</td>
+          <td style="font-size:12px;">{{ r.doc_type }}</td>
+          <td><span class="p-{{ (r.priority or 'normal')|lower }}">{{ r.priority or 'Normal' }}</span></td>
+          <td style="font-size:12px;">{{ r.remarks if r.remarks else '-' }}</td>
+          <td style="font-size:11px;color:var(--muted);">{{ r.updated_at.strftime('%b %d, %Y') if r.updated_at else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;font-size:13px;"><i class="fa fa-box-archive fa-lg mb-2 d-block"></i>No closed documents found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div style="padding:10px 14px;font-size:11px;color:var(--muted);border-top:1px solid #F0EDE8;">
+      {{ records|length }} closed document{{ 's' if records|length != 1 else '' }}
+    </div>
+  </div>
+</div>
+{% endblock %}

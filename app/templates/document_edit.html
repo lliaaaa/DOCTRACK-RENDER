@@ -1,0 +1,106 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div class="d-flex justify-content-between align-items-start mb-4" style="border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <div>
+      <h1 class="dashboard-title">Edit Document</h1>
+      <span class="doc-id mt-1 d-inline-block">{{ record.document_code }}</span>
+    </div>
+    <a href="{{ url_for('main.document_detail', record_id=record.id) }}" class="btn-gov-outline"><i class="fa fa-arrow-left me-1"></i>Back</a>
+  </div>
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <div class="ci"><i class="fa-solid fa-pen-to-square"></i></div>
+        <h3>Edit Document Information</h3>
+      </div>
+
+      <!-- Read-only info bar -->
+      <div style="background:#F5F0E8;border:1px solid #DED8CF;border-radius:6px;padding:12px 14px;margin-bottom:18px;font-size:12px;">
+        <div class="row g-2">
+          <div class="col-sm-4">
+            <div style="color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Date In</div>
+            <div style="font-weight:600;margin-top:2px;">{{ record.created_at.strftime('%b %d, %Y') if record.created_at else '-' }}</div>
+          </div>
+          <div class="col-sm-4">
+            <div style="color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Last Updated</div>
+            <div style="font-weight:600;margin-top:2px;">{{ record.updated_at.strftime('%b %d, %Y %I:%M %p') if record.updated_at else '-' }}</div>
+          </div>
+          <div class="col-sm-4">
+            <div style="color:var(--muted);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Status (read-only)</div>
+            <div style="margin-top:4px;">
+              {% if record.status == 'Closed' %}<span class="status-badge s-closed">Closed</span>
+              {% else %}<span class="status-badge s-process">{{ record.status }}</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('main.edit_document', record_id=record.id) }}">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Document Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="title" required value="{{ record.title }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Document Type</label>
+            <select class="form-select" name="doc_type" id="editDocType" onchange="toggleEditSubCat()">
+              {% for dt in document_types %}
+              <option value="{{ dt.name }}" {% if dt.name == record.doc_type %}selected{% endif %}>{{ dt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6" id="editSubCatWrapper" style="display:{% if record.doc_type == 'SVP' %}block{% else %}none{% endif %};">
+            <label class="form-label">SVP Sub-Category</label>
+            <select class="form-select" name="sub_category" id="editSubCat">
+              <option value="">— None —</option>
+              {% for sc in svp_subcategories %}
+              <option value="{{ sc }}" {% if record.sub_category == sc %}selected{% endif %}>{{ sc }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Priority Level</label>
+            <select class="form-select" name="priority">
+              <option value="Normal" {% if record.priority == 'Normal' %}selected{% endif %}>🟢 Normal</option>
+              <option value="Urgent" {% if record.priority == 'Urgent' %}selected{% endif %}>🔴 Urgent</option>
+              <option value="Routine" {% if record.priority == 'Routine' %}selected{% endif %}>🟠 Routine</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Amount (₱)</label>
+            <input type="number" class="form-control" name="amount" value="{{ record.amount or '' }}" step="0.01" min="0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Implementing Office</label>
+            <input type="text" class="form-control" name="implementing_office" value="{{ record.implementing_office }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Received By</label>
+            <input type="text" class="form-control" name="received_by" value="{{ record.received_by }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Remarks</label>
+            <textarea class="form-control" name="remarks" rows="2">{{ record.remarks or '' }}</textarea>
+          </div>
+          <div class="col-12" style="background:#FDE8E8;border:1px solid #FACACA;border-radius:6px;padding:10px 12px;font-size:12px;color:#8B0000;">
+            <i class="fa fa-circle-info me-1"></i> Status cannot be edited directly. It changes via transfer, receipt, or closing actions.
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn-gov"><i class="fa fa-floppy-disk me-1"></i>Save Changes</button>
+          <a href="{{ url_for('main.document_detail', record_id=record.id) }}" class="btn-gov-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleEditSubCat() {
+  const t = document.getElementById('editDocType').value;
+  document.getElementById('editSubCatWrapper').style.display = t === 'SVP' ? '' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.cat-badge { display:inline-block; font-size:11px; font-weight:700; border-radius:4px; padding:2px 8px; }
+.cat-simple   { background:#E3F2FD; color:#1565C0; }
+.cat-complex  { background:#FFF8E1; color:#E65100; }
+.cat-tech     { background:#FCE4EC; color:#880E4F; }
+.sla-card { background:white; border:1px solid var(--border); border-radius:8px; padding:16px 18px; margin-bottom:12px; }
+.sla-card-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #F0EBE3; }
+.sla-card-header h4 { margin:0; font-size:13px; font-weight:700; color:#3C3028; font-family:var(--serif); }
+.form-grid { display:grid; grid-template-columns:1fr 1fr 1fr auto; gap:10px; align-items:end; }
+@media(max-width:768px){ .form-grid { grid-template-columns:1fr 1fr; } }
+.cfg-row { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #F5F0EB; font-size:12px; }
+.cfg-row:last-child { border-bottom:none; }
+</style>
+
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Citizen Charter SLA Settings</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Configure processing time targets per document type (RA 11032 — Ease of Doing Business)</div>
+  </div>
+
+  <!-- INFO BANNER -->
+  <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:6px;padding:12px 16px;margin-bottom:20px;font-size:12px;color:#1B5E20;">
+    <strong><i class="fa fa-circle-info me-2"></i>Transaction Categories</strong>
+    <div style="margin-top:8px;display:flex;gap:20px;flex-wrap:wrap;">
+      <span><strong class="cat-badge cat-simple">Simple</strong> &nbsp;≤ 3 working days · frontline, routine</span>
+      <span><strong class="cat-badge cat-complex">Complex</strong> &nbsp;≤ 7 working days · requires technical review</span>
+      <span><strong class="cat-badge cat-tech">Highly Technical</strong> &nbsp;≤ 20 working days · legal, specialized assessments</span>
+    </div>
+    <div style="margin-top:8px;opacity:.8;">
+      SLA Color Coding: 
+      <span style="color:#2196F3;font-weight:700;">● Blue (0–24%)</span> On Track &nbsp;
+      <span style="color:#4CAF50;font-weight:700;">● Green (25–49%)</span> In Progress &nbsp;
+      <span style="color:#FF9800;font-weight:700;">● Yellow (50–74%)</span> Urgent &nbsp;
+      <span style="color:#F44336;font-weight:700;">● Red (75–100%)</span> Critical/Overdue
+    </div>
+  </div>
+
+  <!-- PER-TYPE SLA -->
+  <div class="sla-card">
+    <div class="sla-card-header">
+      <div class="ci"><i class="fa fa-file-alt"></i></div>
+      <h4>Document Type SLA Configuration</h4>
+      <span class="cc">{{ doc_types|length }} types</span>
+    </div>
+
+    {% for dt in doc_types %}
+    <form method="POST" style="margin-bottom:10px;">
+      <input type="hidden" name="action" value="save_type_sla">
+      <input type="hidden" name="doc_type_id" value="{{ dt.id }}">
+      <div style="background:#FAFAF8;border:1px solid #EDE8E0;border-radius:6px;padding:12px 14px;">
+        <div style="font-size:12px;font-weight:700;color:#3C3028;margin-bottom:10px;">
+          <i class="fa fa-file me-1" style="color:var(--muted);"></i>{{ dt.type_name }}
+          <span class="cat-badge {% if dt.transaction_category == 'Simple' %}cat-simple{% elif dt.transaction_category == 'Complex' %}cat-complex{% else %}cat-tech{% endif %}" style="margin-left:6px;">{{ dt.transaction_category }}</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:6px;">Current SLA: {{ (dt.sla_minutes / 60)|round(1) }}h</span>
+        </div>
+        <div class="form-grid">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Category</label>
+            <select class="form-select form-select-sm" name="category" onchange="updateSlaDefault(this)">
+              {% for cat in categories %}
+              <option value="{{ cat }}" {% if dt.transaction_category == cat %}selected{% endif %}>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">SLA (minutes)</label>
+            <input type="number" class="form-control form-control-sm" name="sla_minutes"
+                   value="{{ dt.sla_minutes }}" min="1" placeholder="e.g. 4320">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">SLA (hours)</label>
+            <input type="text" class="form-control form-control-sm" readonly
+                   value="{{ (dt.sla_minutes / 60)|round(1) }}h = {{ (dt.sla_minutes / 1440)|round(1) }} day(s)"
+                   style="background:#F5F0E8;color:var(--muted);">
+          </div>
+          <div>
+            <button type="submit" class="btn-gov" style="font-size:12px;padding:7px 14px;white-space:nowrap;">
+              <i class="fa fa-floppy-disk me-1"></i>Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+    {% else %}
+    <p style="color:var(--muted);text-align:center;padding:24px;font-size:13px;">
+      No document types configured. <a href="{{ url_for('main.office_settings') }}">Add document types</a> first.
+    </p>
+    {% endfor %}
+  </div>
+
+  <!-- PER-DEPT CHARTER CONFIGS -->
+  <div class="sla-card">
+    <div class="sla-card-header">
+      <div class="ci"><i class="fa fa-building"></i></div>
+      <h4>Office-Specific Charter Overrides</h4>
+      <span class="cc">{{ configs|length }}</span>
+    </div>
+
+    <form method="POST" style="margin-bottom:16px;">
+      <input type="hidden" name="action" value="save_charter">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Document Type <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm" name="doc_type_id" required>
+            <option value="" disabled selected>Select type...</option>
+            {% for dt in doc_types %}<option value="{{ dt.id }}">{{ dt.type_name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Department (blank = all)</label>
+          <select class="form-select form-select-sm" name="department_id">
+            <option value="">All departments</option>
+            {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Category</label>
+          <select class="form-select form-select-sm" name="category">
+            {% for cat in categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">SLA (minutes)</label>
+          <input type="number" class="form-control form-control-sm" name="sla_minutes" placeholder="e.g. 4320" min="1" required>
+        </div>
+        <div>
+          <button type="submit" class="btn-gov" style="font-size:12px;padding:7px 14px;white-space:nowrap;">
+            <i class="fa fa-plus me-1"></i>Add
+          </button>
+        </div>
+      </div>
+      <div style="margin-top:10px;">
+        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Responsible Person / Office</label>
+        <input type="text" class="form-control form-control-sm" name="responsible_person" placeholder="e.g. Budget Officer, Records Section" style="max-width:400px;">
+      </div>
+    </form>
+
+    {% if configs %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:#F5F0E8;">
+            <th style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid #EDE8E0;">Doc Type</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid #EDE8E0;">Department</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid #EDE8E0;">Category</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid #EDE8E0;">SLA</th>
+            <th style="padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;border-bottom:2px solid #EDE8E0;">Responsible</th>
+            <th style="padding:8px 12px;border-bottom:2px solid #EDE8E0;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cfg in configs %}
+          <tr style="border-bottom:1px solid #F5F0EB;">
+            <td style="padding:9px 12px;font-weight:600;">{{ cfg.doc_type.type_name if cfg.doc_type else '—' }}</td>
+            <td style="padding:9px 12px;">{{ cfg.department.name if cfg.department else '<em style="color:var(--muted);">All</em>' }}</td>
+            <td style="padding:9px 12px;">
+              <span class="cat-badge {% if cfg.category == 'Simple' %}cat-simple{% elif cfg.category == 'Complex' %}cat-complex{% else %}cat-tech{% endif %}">{{ cfg.category }}</span>
+            </td>
+            <td style="padding:9px 12px;font-weight:700;color:var(--gov-red);">{{ cfg.sla_minutes }}m = {{ (cfg.sla_minutes/60)|round(1) }}h</td>
+            <td style="padding:9px 12px;color:#5C5248;">{{ cfg.responsible_person or '—' }}</td>
+            <td style="padding:9px 12px;">
+              <form method="POST" style="display:inline;">
+                <input type="hidden" name="action" value="delete_charter">
+                <input type="hidden" name="config_id" value="{{ cfg.id }}">
+                <button type="submit" class="btn-sm-action ba-delete" style="font-size:11px;padding:3px 8px;" onclick="return confirm('Remove this config?')">
+                  <i class="fa fa-trash me-1"></i>Remove
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);text-align:center;padding:24px;font-size:13px;">
+      <i class="fa fa-circle-info me-2"></i>No overrides configured. All types use their default SLA above.
+    </p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+const DEFAULT_SLA = { 'Simple': 4320, 'Complex': 14400, 'Highly Technical': 43200 };
+
+function updateSlaDefault(sel) {
+  const row = sel.closest('.form-grid') || sel.closest('div');
+  const slaInput = row.querySelector('input[name="sla_minutes"]');
+  if (slaInput && DEFAULT_SLA[sel.value]) {
+    slaInput.value = DEFAULT_SLA[sel.value];
+  }
+}
+</script>
+{% endblock %}

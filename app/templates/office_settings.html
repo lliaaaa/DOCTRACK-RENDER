@@ -1,0 +1,126 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media(max-width:768px){ .settings-grid { grid-template-columns: 1fr; } }
+.settings-card { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 4px rgba(0,0,0,.05); }
+.settings-card h4 { font-size: 15px; font-weight: 700; color: #b71c1c; border-bottom: 2px solid #b71c1c; padding-bottom: 8px; margin-bottom: 16px; }
+.item-list { list-style: none; padding: 0; margin: 0 0 14px; }
+.item-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; font-size: 13px; }
+.item-list li:nth-child(odd) { background: #f9f9f9; }
+.item-list li span { color: #333; }
+.btn-del { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 16px; padding: 0 4px; }
+.btn-del:hover { color: #a00; }
+.btn-del[disabled] { color: #ccc; cursor: not-allowed; }
+.add-form { display: flex; gap: 8px; }
+.add-form input { flex: 1; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; }
+.add-form button { background: #b71c1c; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.add-form button:hover { background: #8f0707; }
+.info-card { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 4px rgba(0,0,0,.05); margin-bottom: 20px; }
+.info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+.info-row:last-child { border-bottom: none; }
+.info-label { font-weight: 600; color: #555; }
+.info-value { color: #222; }
+.locked-badge { font-size: 10px; background: #E8EAF6; color: #3949AB; border: 1px solid #9FA8DA; border-radius: 3px; padding: 1px 6px; font-weight: 700; margin-left: 6px; }
+.subcat-pill { display: inline-block; background: #FFF3E0; color: #E65100; border: 1px solid #FFB74D; border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin: 2px 2px 2px 0; }
+.workflow-step { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 12px; color: #333; }
+.step-num { min-width: 20px; height: 20px; border-radius: 50%; background: #b71c1c; color: white; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.step-arrow { color: #b71c1c; font-size: 10px; }
+</style>
+
+<div class="content">
+  <h1 class="dashboard-title">Office Settings</h1>
+  <p style="color:#666;margin-bottom:20px;">Manage document types, statuses, and view office information for <strong>{{ current_user.department }}</strong>.</p>
+
+  <!-- Office Info -->
+  <div class="info-card">
+    <h4 style="font-size:15px;font-weight:700;color:#333;margin-bottom:12px;">📋 Office Information</h4>
+    <div class="info-row"><span class="info-label">Office / Department</span><span class="info-value">{{ current_user.department }}</span></div>
+    <div class="info-row"><span class="info-label">Admin</span><span class="info-value">{{ current_user.full_name }}</span></div>
+    <div class="info-row"><span class="info-label">Total Staff</span><span class="info-value">{{ staff_count }} member{{ 's' if staff_count != 1 else '' }}</span></div>
+  </div>
+
+  <div class="settings-grid" style="margin-bottom:20px;">
+    <!-- DOCUMENT TYPES (locked SVP + Bidding) -->
+    <div class="settings-card">
+      <h4>📄 Document Types</h4>
+      <!-- SVP - locked core type -->
+      <div style="border:1px solid #E3F2FD;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#FAFCFF;">
+        <div style="display:flex;align-items:center;margin-bottom:8px;">
+          <span style="font-weight:700;font-size:13px;color:#1A3A6B;">SVP</span>
+          <span class="locked-badge">CORE TYPE</span>
+        </div>
+        <div style="font-size:11.5px;color:#666;margin-bottom:6px;">Sub-categories:</div>
+        <div>
+          {% for sc in svp_subcategories %}
+          <span class="subcat-pill">{{ sc }}</span>
+          {% endfor %}
+        </div>
+        <div style="margin-top:10px;">
+          <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;">Workflow</div>
+          {% for step in svp_workflow %}
+          <div class="workflow-step">
+            <span class="step-num">{{ loop.index }}</span>
+            <span>{{ step }}</span>
+          </div>
+          {% if not loop.last %}<div style="padding-left:8px;color:#b71c1c;font-size:10px;">↓</div>{% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Bidding - locked core type -->
+      <div style="border:1px solid #E8F5E9;border-radius:8px;padding:12px 14px;margin-bottom:10px;background:#FAFFFE;">
+        <div style="display:flex;align-items:center;">
+          <span style="font-weight:700;font-size:13px;color:#2E7D32;">Bidding</span>
+          <span class="locked-badge" style="background:#E8F5E9;color:#2E7D32;border-color:#A5D6A7;">CORE TYPE</span>
+        </div>
+        <div style="font-size:12px;color:#666;margin-top:6px;">Standard bidding documents follow the regular workflow.</div>
+      </div>
+
+      <!-- Other doc types (deletable) -->
+      {% set other_types = doc_types | selectattr('name', 'ne', 'SVP') | selectattr('name', 'ne', 'Bidding') | list %}
+      {% if other_types %}
+      <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;margin-top:4px;">Other Types</div>
+      <ul class="item-list">
+        {% for dt in other_types %}
+        <li>
+          <span>{{ dt.name }}</span>
+          <form method="POST" action="{{ url_for('main.office_settings') }}" style="display:inline"
+                onsubmit="return confirm('Delete this document type?')">
+            <input type="hidden" name="action" value="delete_doc_type">
+            <input type="hidden" name="id" value="{{ dt.id }}">
+            <button type="submit" class="btn-del" title="Delete">✕</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+
+    <!-- DOCUMENT STATUSES -->
+    <div class="settings-card">
+      <h4>🔖 Document Statuses</h4>
+      <ul class="item-list">
+        {% for ds in doc_statuses %}
+        <li>
+          <span>{{ ds.name }}</span>
+          <form method="POST" action="{{ url_for('main.office_settings') }}" style="display:inline"
+                onsubmit="return confirm('Delete this status?')">
+            <input type="hidden" name="action" value="delete_status">
+            <input type="hidden" name="id" value="{{ ds.id }}">
+            <button type="submit" class="btn-del" title="Delete">✕</button>
+          </form>
+        </li>
+        {% else %}
+        <li><span style="color:#999;">No statuses defined.</span></li>
+        {% endfor %}
+      </ul>
+      <form method="POST" action="{{ url_for('main.office_settings') }}" class="add-form">
+        <input type="hidden" name="action" value="add_status">
+        <input type="text" name="name" placeholder="New status..." required>
+        <button type="submit"><i class="fa fa-plus me-1"></i>Add</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

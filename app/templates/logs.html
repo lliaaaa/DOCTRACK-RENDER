@@ -1,0 +1,126 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.badge-action {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.badge-create            { background: #D1EDD8; color: #1A5C2E; }
+.badge-edit              { background: #DBEAFE; color: #1A3A6B; }
+.badge-transfer          { background: #FEF3C2; color: #7A5700; }
+.badge-received          { background: #D1EDD8; color: #0f5132; }
+.badge-rejected_transfer { background: #FDE8E8; color: #8B0000; }
+.badge-close             { background: #E8E4DF; color: #5C5248; }
+.badge-assigned          { background: #E8DFFE; color: #4B1FA8; }
+.badge-default           { background: #F0EDE8; color: #5C5248; }
+</style>
+
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Activity Logs</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Audit trail for <strong>{{ current_user.department }}</strong></div>
+  </div>
+
+  <div class="gov-card" style="padding:14px 18px;margin-bottom:16px;">
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
+      <select name="action" class="form-select" style="max-width:180px;font-size:13px;" onchange="this.form.submit()">
+        <option value="">All Actions</option>
+        <option value="create"            {% if action_filter=='create' %}selected{% endif %}>Create</option>
+        <option value="edit"              {% if action_filter=='edit' %}selected{% endif %}>Edit</option>
+        <option value="transfer"          {% if action_filter=='transfer' %}selected{% endif %}>Transfer</option>
+        <option value="received"          {% if action_filter=='received' %}selected{% endif %}>Received</option>
+        <option value="rejected_transfer" {% if action_filter=='rejected_transfer' %}selected{% endif %}>Rejected</option>
+        <option value="close"             {% if action_filter=='close' %}selected{% endif %}>Close</option>
+      </select>
+      <input type="text" id="logSearch" placeholder="Search by document, user..." oninput="filterLogs()" class="form-control" style="max-width:260px;font-size:13px;">
+      {% if action_filter %}
+      <a href="{{ url_for('main.activity_logs') }}" class="btn-gov-outline"><i class="fa fa-xmark me-1"></i>Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="gov-card" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>Document</th>
+            <th>From → To</th>
+            <th>By</th>
+            <th>Status</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in records %}
+          <tr data-search="{{ h.action_type|lower }} {{ (h.record.document_code if h.record else '')|lower }} {{ (h.action_by or '')|lower }}">
+
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">
+              {{ h.timestamp.strftime('%b %d, %Y  %H:%M') if h.timestamp else '-' }}
+            </td>
+
+            <td>
+              <span class="badge-action badge-{{ h.action_type if h.action_type in ['create','edit','transfer','received','rejected_transfer','close','assigned'] else 'default' }}">
+                {{ h.action_type }}
+              </span>
+            </td>
+
+            <td>
+              {% if h.record %}
+              <a href="{{ url_for('main.document_detail', record_id=h.record.id) }}" class="doc-id" style="text-decoration:none;">{{ h.record.document_code }}</a>
+              {% else %}-{% endif %}
+            </td>
+
+            <td style="font-size:12px;">
+              {% if h.action_type in ['received', 'rejected_transfer'] %}
+                {% if h.to_department and h.from_department %}
+                  <span>{{ h.to_department }}</span>
+                  <i class="fa fa-arrow-left fa-xs mx-1" style="opacity:.4;"></i>
+                  {{ h.from_department }}
+                {% elif h.to_department %}{{ h.to_department }}
+                {% else %}-{% endif %}
+              {% elif h.from_department and h.to_department and h.from_department != h.to_department %}
+                {{ h.from_department }} <i class="fa fa-arrow-right fa-xs mx-1" style="opacity:.4;"></i> {{ h.to_department }}
+              {% elif h.to_department %}{{ h.to_department }}
+              {% elif h.from_department %}{{ h.from_department }}
+              {% else %}-{% endif %}
+            </td>
+
+            <td style="font-size:12px;">{{ h.action_by or '-' }}</td>
+            <td style="font-size:12px;">{{ h.status }}</td>
+            <td style="font-size:11px;color:var(--muted);font-style:italic;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+              {{ h.remarks or '-' }}
+            </td>
+
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">
+              <i class="fa fa-clipboard-list fa-lg mb-2 d-block"></i>No activity logs found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:10px 14px;font-size:11px;color:var(--muted);border-top:1px solid #F0EDE8;">
+      {{ records|length }} log entr{{ 'ies' if records|length != 1 else 'y' }}
+    </div>
+  </div>
+</div>
+
+<script>
+function filterLogs() {
+  const q = document.getElementById('logSearch').value.toLowerCase();
+  document.querySelectorAll('#logTable tbody tr').forEach(row => {
+    row.style.display = (row.dataset.search || '').includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

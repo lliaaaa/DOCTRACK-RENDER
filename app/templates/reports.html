@@ -1,0 +1,374 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.rpt-stat { background:white; border-radius:8px; padding:16px 18px; border:1px solid var(--border);
+  box-shadow:0 1px 4px rgba(0,0,0,.06); position:relative; overflow:hidden; }
+.rpt-stat::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--gov-red); }
+.rpt-stat.st-orange::before { background:#FF9800; }
+.rpt-stat.st-green::before  { background:#4CAF50; }
+.rpt-stat.st-blue::before   { background:#1A3A6B; }
+.rpt-stat h2 { font-family:var(--serif); font-size:26px; font-weight:800; color:var(--gov-red); margin:0 0 2px; }
+.rpt-stat.st-orange h2 { color:#E65100; }
+.rpt-stat.st-green h2  { color:#2E7D32; }
+.rpt-stat.st-blue h2   { color:#1A3A6B; }
+.rpt-stat p { margin:0; color:var(--muted); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+.chart-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:768px){ .chart-grid { grid-template-columns:1fr; } }
+.chart-box { background:white; border-radius:8px; padding:18px; border:1px solid var(--border); box-shadow:0 1px 4px rgba(0,0,0,.06); }
+.chart-box h4 { font-family:var(--serif); font-size:13px; font-weight:700; color:#3C3028; margin-bottom:12px; border-bottom:1px solid #EDE8E0; padding-bottom:8px; }
+canvas { max-height:220px; }
+.sum-table { width:100%; border-collapse:collapse; }
+.sum-table th { background:#F5F0E8; font-size:11px; text-transform:uppercase; font-weight:700; color:var(--muted); padding:9px 12px; border-bottom:2px solid #EDE8E0; }
+.sum-table td { padding:8px 12px; font-size:13px; border-bottom:1px solid #F5F0EB; }
+.sum-table tr:last-child td { border-bottom:none; }
+.sum-table tr:hover td { background:#FBF8F5; }
+.bar-fill { display:inline-block; height:8px; border-radius:4px; background:var(--gov-red); opacity:.7; margin-right:6px; vertical-align:middle; }
+</style>
+
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Summary Reports</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Document statistics for <strong>{{ current_user.department }}</strong></div>
+  </div>
+
+  <!-- DATE FILTER -->
+  <div class="gov-card" style="padding:16px 18px;margin-bottom:18px;">
+    <div class="gov-card-header" style="margin-bottom:12px;">
+      <div class="ci"><i class="fa-solid fa-calendar-range"></i></div>
+      <h3>Date Filter</h3>
+      {% if date_from or date_to %}<span class="cc">Filtered</span>{% endif %}
+    </div>
+    <form method="GET" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+      <div>
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:3px;">From</label>
+        <input type="date" name="from" value="{{ date_from }}" class="form-control" style="font-size:13px;width:auto;">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);display:block;margin-bottom:3px;">To</label>
+        <input type="date" name="to" value="{{ date_to }}" class="form-control" style="font-size:13px;width:auto;">
+      </div>
+      <button type="submit" class="btn-gov"><i class="fa fa-filter me-1"></i>Apply</button>
+      {% if date_from or date_to %}
+      <a href="{{ url_for('main.reports') }}" class="btn-gov-outline"><i class="fa fa-xmark me-1"></i>Clear</a>
+      {% endif %}
+    </form>
+  </div>
+
+
+  <!-- ============================================================ -->
+  <!-- OFFICE ANALYTICS — Stuck/Delayed + Avg Processing           -->
+  <!-- ============================================================ -->
+  <div class="gov-card" style="margin-bottom:18px;">
+    <div class="gov-card-header" style="margin-bottom:14px;">
+      <div class="ci"><i class="fa-solid fa-stopwatch"></i></div>
+      <h3>Office Processing Time Analysis</h3>
+    </div>
+
+    <div class="row g-3">
+      <!-- Stuck / Delayed per office — FIRST -->
+      <div class="col-md-6">
+        <h4 style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px;">
+          <i class="fa fa-triangle-exclamation me-1"></i> Stuck / Delayed Per Office
+          <span style="font-size:11px;font-weight:400;color:var(--muted);">(active documents)</span>
+        </h4>
+        {% if office_stuck_summary %}
+        <table class="sum-table">
+          <thead><tr><th>Office</th><th>Avg Hours</th><th>Max Hours</th><th>Docs</th></tr></thead>
+          <tbody>
+            {% for dept_name, avg_hrs, max_hrs, count in office_stuck_summary %}
+            <tr>
+              <td style="font-size:12px;">{{ dept_name }}</td>
+              <td style="font-weight:700;color:{% if avg_hrs > 48 %}#C62828{% elif avg_hrs > 16 %}#E65100{% else %}#FF9800{% endif %};">
+                {{ avg_hrs }}h
+              </td>
+              <td style="color:#8B1A1A;font-size:12px;font-weight:600;">{{ max_hrs }}h</td>
+              <td style="color:var(--muted);font-size:12px;">{{ count }} doc{{ 's' if count != 1 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;">
+          Avg = average time docs have been sitting in office. Max = longest single doc waiting.
+        </div>
+        {% else %}
+        <p style="font-size:12px;color:var(--muted);">No active documents with delays.</p>
+        {% endif %}
+      </div>
+
+      <!-- Average processing time per office (completed transfers) — SECOND -->
+      <div class="col-md-6">
+        <h4 style="font-size:13px;font-weight:700;color:var(--primary);margin-bottom:10px;">
+          <i class="fa fa-clock me-1"></i> Avg. Processing Time Per Office
+          <span style="font-size:11px;font-weight:400;color:var(--muted);">(completed transfers)</span>
+        </h4>
+        {% if office_processing %}
+        <table class="sum-table">
+          <thead><tr><th>Office</th><th>Avg Hours</th><th>Transfers</th><th style="width:90px;">Bar</th></tr></thead>
+          <tbody>
+            {% set max_proc = office_processing[0][1] if office_processing else 1 %}
+            {% for dept_name, avg_hrs, count in office_processing %}
+            <tr>
+              <td style="font-size:12px;">{{ dept_name }}</td>
+              <td style="font-weight:700;color:{% if avg_hrs > 24 %}#C62828{% elif avg_hrs > 8 %}#E65100{% else %}#2E7D32{% endif %};">
+                {{ avg_hrs }}h
+              </td>
+              <td style="color:var(--muted);font-size:12px;">{{ count }}</td>
+              <td>
+                <span class="bar-fill" style="width:{{ [4,(avg_hrs/(max_proc or 1)*80)|int]|max }}px;
+                  background:{% if avg_hrs > 24 %}#C62828{% elif avg_hrs > 8 %}#FF9800{% else %}#2E7D32{% endif %};"></span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div style="font-size:10px;color:var(--muted);margin-top:6px;">
+          <span style="color:#2E7D32;">●</span> Under 8h &nbsp;
+          <span style="color:#FF9800;">●</span> 8–24h &nbsp;
+          <span style="color:#C62828;">●</span> Over 24h
+        </div>
+        {% else %}
+        <p style="font-size:12px;color:var(--muted);">No completed transfer data yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Chart: Avg processing hours by office -->
+    {% if office_processing %}
+    <div style="margin-top:18px;">
+      <h4 style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">
+        <i class="fa fa-chart-bar me-1"></i> Processing Hours by Office (chart)
+      </h4>
+      <div style="max-height:220px;"><canvas id="officeTimeChart"></canvas></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SLA TIER SUMMARY -->
+  {% if tier_dict %}
+  <div class="row g-3 mb-4">
+    {% set tier_data = [('blue','#2196F3','#E3F2FD','On Track'),('green','#4CAF50','#E8F5E9','In Progress'),('yellow','#FF9800','#FFF8E1','Urgent'),('red','#F44336','#FFEBEE','Critical')] %}
+    {% for tier,color,bg,label in tier_data %}
+    <div class="col-6 col-xl-3">
+      <div style="border-radius:8px;padding:14px 16px;background:{{ bg }};border:1px solid {{ color }}30;">
+        <div style="font-size:22px;font-weight:800;color:{{ color }};font-family:var(--serif);">{{ tier_dict.get(tier,0) }}</div>
+        <div style="font-size:11px;font-weight:700;color:{{ color }};text-transform:uppercase;letter-spacing:.5px;margin-top:2px;">{{ label }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- CHARTS -->
+  <div class="chart-grid mb-4">
+    <div class="chart-box">
+      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>By Document Type</h4>
+      <canvas id="typeChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Status</h4>
+      <canvas id="statusChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>SLA Tier Distribution (Active)</h4>
+      <canvas id="tierChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Department</h4>
+      <canvas id="deptChart"></canvas>
+    </div>
+    <div class="chart-box" style="grid-column:span 2;">
+      <h4><i class="fa fa-chart-line fa-xs me-1"></i>Monthly Document Volume</h4>
+      <canvas id="monthlyChart" style="max-height:160px;"></canvas>
+    </div>
+    {% if subcat_summary %}
+    <div class="chart-box">
+      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>SVP by Sub-Category</h4>
+      <canvas id="subcatChart"></canvas>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-peso-sign fa-xs me-1"></i>SVP Financial by Sub-Category</h4>
+      <canvas id="subcatFinChart"></canvas>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SUMMARY TABLES -->
+  <div class="chart-grid mb-4">
+    <div class="chart-box">
+      <h4><i class="fa fa-tags fa-xs me-1"></i>By Status</h4>
+      {% set max_stat = status_summary[0][1] if status_summary else 1 %}
+      <table class="sum-table">
+        <thead><tr><th>Status</th><th>Count</th><th style="width:100px;">%</th></tr></thead>
+        <tbody>
+          {% for st,cnt in status_summary %}
+          <tr>
+            <td><span class="status-badge s-process" style="font-size:11px;">{{ st }}</span></td>
+            <td style="font-weight:700;color:#1A3A6B;">{{ cnt }}</td>
+            <td>
+              <span class="bar-fill" style="width:{{ [1,(cnt/max_stat*80)|int]|max }}px;background:#1A3A6B;"></span>
+              <span style="font-size:11px;color:var(--muted);">{{ ((cnt/total_docs)*100)|round(1) if total_docs else 0 }}%</span>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px;">No data</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-building fa-xs me-1"></i>By Department</h4>
+      {% set max_dept = dept_summary[0][1] if dept_summary else 1 %}
+      <table class="sum-table">
+        <thead><tr><th>Department</th><th>Count</th><th style="width:100px;">%</th></tr></thead>
+        <tbody>
+          {% for dept,cnt in dept_summary %}
+          <tr>
+            <td style="font-weight:500;font-size:12px;">{{ dept or '—' }}</td>
+            <td style="font-weight:700;color:var(--gov-red);">{{ cnt }}</td>
+            <td>
+              <span class="bar-fill" style="width:{{ [1,(cnt/max_dept*80)|int]|max }}px;"></span>
+              <span style="font-size:11px;color:var(--muted);">{{ ((cnt/total_docs)*100)|round(1) if total_docs else 0 }}%</span>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px;">No data</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-file fa-xs me-1"></i>By Document Type</h4>
+      {% set max_type = type_summary[0][1] if type_summary else 1 %}
+      <table class="sum-table">
+        <thead><tr><th>Type</th><th>Count</th><th style="width:100px;">%</th></tr></thead>
+        <tbody>
+          {% for tp,cnt in type_summary %}
+          <tr>
+            <td style="font-weight:500;font-size:12px;">{{ tp }}</td>
+            <td style="font-weight:700;color:#584f4d;">{{ cnt }}</td>
+            <td>
+              <span class="bar-fill" style="width:{{ [1,(cnt/max_type*80)|int]|max }}px;background:#584f4d;"></span>
+              <span style="font-size:11px;color:var(--muted);">{{ ((cnt/total_docs)*100)|round(1) if total_docs else 0 }}%</span>
+            </td>
+          </tr>
+          {% else %}<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:16px;">No data</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box">
+      <h4><i class="fa fa-peso-sign fa-xs me-1"></i>Financial Summary by Type</h4>
+      <table class="sum-table">
+        <thead><tr><th>Document Type</th><th>Total Amount</th></tr></thead>
+        <tbody>
+          {% for tp,amt in financial %}
+          <tr>
+            <td style="font-weight:500;font-size:12px;">{{ tp }}</td>
+            <td style="font-weight:700;color:#1A3A6B;">₱{{ "{:,.2f}".format(amt) }}</td>
+          </tr>
+          {% else %}<tr><td colspan="2" style="color:var(--muted);text-align:center;padding:16px;">No financial data</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if subcat_summary %}
+    <div class="chart-box" style="grid-column:span 2;">
+      <h4><i class="fa fa-tags fa-xs me-1"></i>SVP Sub-Category Breakdown</h4>
+      {% set max_sc = subcat_summary[0][1] if subcat_summary else 1 %}
+      {% set svp_total = subcat_summary | sum(attribute=1) %}
+      <table class="sum-table">
+        <thead><tr><th>Sub-Category</th><th>Count</th><th>Amount</th><th style="width:100px;">%</th></tr></thead>
+        <tbody>
+          {% for sc,cnt in subcat_summary %}
+          {% set sc_amt = subcat_financial | selectattr(0, 'equalto', sc) | map(attribute=1) | first | default(0) %}
+          <tr>
+            <td><span style="background:#FFF3E0;color:#E65100;border:1px solid #FFB74D;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:600;">{{ sc }}</span></td>
+            <td style="font-weight:700;color:#E65100;">{{ cnt }}</td>
+            <td style="font-weight:600;color:#1A3A6B;font-size:12px;">₱{{ "{:,.2f}".format(sc_amt) if sc_amt else '—' }}</td>
+            <td>
+              <span class="bar-fill" style="width:{{ [1,(cnt/max_sc*80)|int]|max }}px;background:#E65100;"></span>
+              <span style="font-size:11px;color:var(--muted);">{{ ((cnt/svp_total)*100)|round(1) if svp_total else 0 }}%</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const palette = ['#8B1A1A','#1A3A6B','#584f4d','#FF9800','#2E7D32','#6A1B9A','#00838F','#C62828','#E65100'];
+
+function makeChart(id, type, labels, data, color) {
+  const ctx = document.getElementById(id);
+  if (!ctx || !labels.length) return;
+  new Chart(ctx, {
+    type,
+    data: { labels, datasets: [{ data, backgroundColor: type==='pie'||type==='doughnut' ? palette : color,
+      borderColor: type!=='pie'&&type!=='doughnut' ? color : undefined,
+      borderWidth: type!=='pie'&&type!=='doughnut' ? 1.5 : 0, tension:0.3 }] },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins: { legend: { display: type==='pie'||type==='doughnut', position:'right', labels:{font:{size:11},boxWidth:12} } },
+      scales: type!=='pie'&&type!=='doughnut' ? {
+        y:{beginAtZero:true,ticks:{font:{size:11}},grid:{color:'#F0EBE3'}},
+        x:{ticks:{font:{size:11}},grid:{display:false}} } : {}
+    }
+  });
+}
+
+makeChart('typeChart',    'pie',       {{ type_summary|map(attribute=0)|list|tojson }},   {{ type_summary|map(attribute=1)|list|tojson }},   palette);
+makeChart('statusChart',  'bar',       {{ status_summary|map(attribute=0)|list|tojson }}, {{ status_summary|map(attribute=1)|list|tojson }}, '#1A3A6B');
+makeChart('deptChart',    'bar',       {{ dept_summary|map(attribute=0)|list|tojson }},   {{ dept_summary|map(attribute=1)|list|tojson }},   '#8B1A1A');
+makeChart('monthlyChart', 'bar',       {{ monthly|map(attribute=0)|list|tojson }},        {{ monthly|map(attribute=1)|list|tojson }},        '#584f4d');
+
+// SLA Tier doughnut
+const tierData = {
+  labels: ['On Track','In Progress','Urgent','Critical'],
+  values: [{{ tier_dict.get('blue',0) }},{{ tier_dict.get('green',0) }},{{ tier_dict.get('yellow',0) }},{{ tier_dict.get('red',0) }}],
+  colors: ['#2196F3','#4CAF50','#FF9800','#F44336']
+};
+const tierCtx = document.getElementById('tierChart');
+if (tierCtx && tierData.values.some(v=>v>0)) {
+  new Chart(tierCtx, {
+    type: 'doughnut',
+    data: { labels: tierData.labels, datasets:[{ data: tierData.values, backgroundColor: tierData.colors, borderWidth:2 }] },
+    options: { responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ position:'right', labels:{font:{size:11},boxWidth:12} } } }
+  });
+}
+
+// SVP Sub-category charts
+{% if subcat_summary %}
+const subcatLabels = {{ subcat_summary|map(attribute=0)|list|tojson }};
+const subcatCounts = {{ subcat_summary|map(attribute=1)|list|tojson }};
+const subcatAmts   = {{ subcat_financial|map(attribute=1)|list|tojson }};
+const subcatColors = ['#E65100','#F57C00','#FF8F00'];
+
+makeChart('subcatChart',    'doughnut', subcatLabels, subcatCounts, subcatColors);
+makeChart('subcatFinChart', 'bar',      subcatLabels, subcatAmts,   '#E65100');
+{% endif %}
+
+// Office processing time chart
+{% if office_processing %}
+const officeLabels = {{ office_processing | map(attribute=0) | list | tojson }};
+const officeHours  = {{ office_processing | map(attribute=1) | list | tojson }};
+const officeColors = officeHours.map(h => h > 24 ? '#C62828' : h > 8 ? '#FF9800' : '#2E7D32');
+const officeCtx = document.getElementById('officeTimeChart');
+if (officeCtx) {
+  new Chart(officeCtx, {
+    type: 'bar',
+    data: { labels: officeLabels, datasets: [{ data: officeHours, backgroundColor: officeColors, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.x + ' hrs avg' } } },
+      scales: {
+        x: { beginAtZero: true, ticks: { font: {size:11} }, title: { display:true, text:'Average Hours', font:{size:11} } },
+        y: { ticks: { font: {size:10} } }
+      }
+    }
+  });
+}
+{% endif %}
+</script>
+{% endblock %}

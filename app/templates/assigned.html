@@ -1,0 +1,174 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Assigned</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+      Documents assigned to staff in <strong>{{ current_user.department }}</strong>
+    </div>
+  </div>
+
+  <div class="gov-card" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Doc ID</th>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Assigned To</th>
+            <th>Status</th>
+            <th>SLA</th>
+            <th>Last Updated</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in records %}
+          {% set sla = r._sla %}
+          {% set tc = {'blue':'#2196F3','green':'#4CAF50','yellow':'#FF9800','red':'#F44336'} %}
+          {% set tbg = {'blue':'#E3F2FD','green':'#E8F5E9','yellow':'#FFF8E1','red':'#FFEBEE'} %}
+          <tr style="{% if sla.tier == 'red' %}background:#FFEBEE;{% elif sla.tier == 'yellow' %}background:#FFF8E1;{% endif %}">
+            <td><span class="doc-id">{{ r.document_code }}</span></td>
+            <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.title }}</td>
+            <td style="font-size:12px;">{{ r.doc_type }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:24px;height:24px;border-radius:50%;background:#8f0707;color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;">
+                  {{ r.received_by[0]|upper if r.received_by else '?' }}
+                </div>
+                <span style="font-size:12px;">{{ r.received_by or '—' }}</span>
+              </div>
+            </td>
+            <td><span class="status-badge s-process">{{ r.status }}</span></td>
+            <td style="min-width:110px;">
+              <span style="font-size:9.5px;font-weight:700;border-radius:3px;padding:1px 6px;background:{{ tbg[sla.tier] }};color:{{ tc[sla.tier] }};">{{ sla.tier_label }}</span>
+              <div style="height:4px;background:#e0e0e0;border-radius:2px;margin-top:3px;overflow:hidden;">
+                <div style="height:4px;width:{{ sla.pct }}%;background:{{ tc[sla.tier] }};border-radius:2px;"></div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:1px;">{{ sla.hours_left }}h left</div>
+            </td>
+            <td style="font-size:11px;color:var(--muted);">{{ r.updated_at.strftime('%b %d, %Y %H:%M') if r.updated_at else '-' }}</td>
+            <td style="display:flex;gap:6px;">
+              <a href="{{ url_for('main.document_detail', record_id=r.id) }}" class="btn-sm-action ba-view">
+                <i class="fa fa-eye me-1"></i>View
+              </a>
+              {% if current_user.role == 'admin' %}
+              <button class="btn-sm-action ba-edit reassign-btn"
+                      data-record-id="{{ r.id }}"
+                      data-doc-id="{{ r.document_code }}"
+                      data-title="{{ r.title }}"
+                      data-assigned="{{ r.received_by or '' }}">
+                <i class="fa fa-user-pen me-1"></i>Reassign
+              </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">
+              <i class="fa fa-user-check fa-lg mb-2 d-block"></i>
+              No assigned documents.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:10px 14px;font-size:11px;color:var(--muted);border-top:1px solid #F0EDE8;">
+      {{ records|length }} document{{ 's' if records|length != 1 else '' }}
+    </div>
+  </div>
+</div>
+
+<!-- ASSIGN / REASSIGN MODAL -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-user-check me-2"></i>Reassign Document</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#F5F0E8;border-radius:5px;padding:10px 12px;margin-bottom:14px;font-size:12px;">
+          <span style="color:var(--muted);">Document:</span>
+          <strong id="assignDocId" style="color:#8f0707;font-family:monospace;"></strong>
+          — <span id="assignDocTitle"></span>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Assign To <span style="color:#dc2626;">*</span></label>
+          <select class="form-select" id="assignTo">
+            <option value="" disabled selected>Select staff member...</option>
+            {% for u in dept_users %}
+            <option value="{{ u.full_name }}">{{ u.full_name }} ({{ u.role }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-1">
+          <label class="form-label">Remarks <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
+          <textarea class="form-control" id="assignRemarks" rows="2" placeholder="Instructions or notes..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-gov btn-sm" id="confirmAssignBtn">
+          <i class="fa fa-user-check me-1"></i>Confirm Assignment
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentRecordId = null;
+const assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+
+document.querySelectorAll('.reassign-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    currentRecordId = this.dataset.recordId;
+    document.getElementById('assignDocId').textContent = this.dataset.docId;
+    document.getElementById('assignDocTitle').textContent = this.dataset.title;
+    // Pre-select current assigned person if exists
+    const sel = document.getElementById('assignTo');
+    const current = this.dataset.assigned;
+    for (let opt of sel.options) {
+      if (opt.value === current) { opt.selected = true; break; }
+    }
+    document.getElementById('assignRemarks').value = '';
+    assignModal.show();
+  });
+});
+
+document.getElementById('confirmAssignBtn').addEventListener('click', async function() {
+  const assignedTo = document.getElementById('assignTo').value;
+  const remarks = document.getElementById('assignRemarks').value.trim();
+  if (!assignedTo) {
+    document.getElementById('assignTo').classList.add('is-invalid');
+    return;
+  }
+  document.getElementById('assignTo').classList.remove('is-invalid');
+  this.disabled = true;
+  this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Assigning...';
+  try {
+    const res = await fetch(`/documents/assign/${currentRecordId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assigned_to: assignedTo, remarks })
+    });
+    const data = await res.json();
+    if (data.success) {
+      assignModal.hide();
+      location.reload();
+    } else {
+      alert(data.message || 'Failed to assign.');
+      this.disabled = false;
+      this.innerHTML = '<i class="fa fa-user-check me-1"></i>Confirm Assignment';
+    }
+  } catch (err) {
+    alert('Error occurred.');
+    this.disabled = false;
+    this.innerHTML = '<i class="fa fa-user-check me-1"></i>Confirm Assignment';
+  }
+});
+</script>
+{% endblock %}

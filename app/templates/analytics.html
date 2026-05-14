@@ -1,0 +1,110 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.content { max-width: 1200px; }
+.analytics-card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.chart-container { position: relative; height: 400px; margin-bottom: 20px; }
+canvas { max-width: 100%; }
+.no-data { text-align: center; color: #999; padding: 60px 20px; }
+.bottleneck-table { width: 100%; border-collapse: collapse; }
+.bottleneck-table th, .bottleneck-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+.bottleneck-table th { background: #f1f3f5; font-weight: 600; text-transform: uppercase; }
+</style>
+
+<div class="content">
+  <h1 class="dashboard-title">Bottleneck Analytics</h1>
+  <p>Average time spent per department (hours). Departments above mean+stdev are flagged as bottlenecks.</p>
+
+  <div class="analytics-card">
+    {% if labels and labels|length > 0 %}
+    <div class="chart-container">
+      <canvas id="avgChart"></canvas>
+    </div>
+    {% else %}
+    <div class="no-data">
+      <p>Insufficient data to generate chart. Need document history with transitions.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="analytics-card">
+    <h3>Bottleneck Departments</h3>
+    {% if bottlenecks %}
+    <table class="bottleneck-table">
+      <thead><tr><th>Department</th><th>Avg Hours</th><th>Transitions</th></tr></thead>
+      <tbody>
+        {% for b in bottlenecks %}
+        <tr>
+          <td><strong>{{ b.department }}</strong></td>
+          <td>{{ "%.1f"|format(b.avg_hours) }}</td>
+          <td>{{ b.count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>No bottlenecks detected or insufficient data.</p>
+    {% endif %}
+  </div>
+
+  <div class="analytics-card">
+    <h3>ML Model Summary</h3>
+    {% if ml_available %}
+    {% if ml_summary and ml_summary.r2 is not none %}
+    <p><strong>Model R² Score:</strong> {{ "%.3f"|format(ml_summary.r2) }}</p>
+    <p><strong>Top Features:</strong></p>
+    <ul>
+      {% for f, s in ml_summary.top_features %}
+      <li>{{ f }} — {{ "%.3f"|format(s) }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>ML model requires at least 30 document transitions to train. Current data: insufficient.</p>
+    {% endif %}
+    {% else %}
+    <p>{{ ml_summary }}</p>
+    {% endif %}
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const labels = JSON.parse('{{ labels|tojson }}');
+const values = JSON.parse('{{ values|tojson }}');
+
+if (labels && labels.length > 0 && values && values.length > 0) {
+  const ctx = document.getElementById('avgChart');
+  if (ctx) {
+    try {
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Average Hours',
+            data: values,
+            backgroundColor: 'rgba(183, 28, 28, 0.6)',
+            borderColor: 'rgba(183, 28, 28, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Hours' } },
+            x: { title: { display: true, text: 'Department' } }
+          },
+          plugins: {
+            legend: { display: true, position: 'top' }
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Chart.js error:', e);
+    }
+  }
+}
+</script>
+
+{% endblock %}

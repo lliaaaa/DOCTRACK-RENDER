@@ -1,0 +1,273 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="content">
+  <div class="d-flex justify-content-between align-items-center mb-3" style="border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <div>
+      <h1 class="dashboard-title">Create New Document</h1>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px;">Complete all required fields to create a new document record.</div>
+    </div>
+  </div>
+  <div class="gov-card">
+    <div class="gov-card-header">
+      <div class="ci"><i class="fa-solid fa-file-circle-plus"></i></div>
+      <h3>Document Information</h3>
+    </div>
+    <form method="POST" action="{{ url_for('main.add_document') }}" id="newDocForm">
+      <div class="row g-3">
+
+        <!-- STEP 1: Document Type -->
+        <div class="col-md-6">
+          <label class="form-label">Document Type <span class="text-danger">*</span></label>
+          <select class="form-select" name="doc_type" id="docTypeSelect" required onchange="onTypeChange()">
+            <option value="" selected disabled>Select type...</option>
+            {% for dt in document_type %}
+            <option value="{{ dt.name }}">{{ dt.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- STEP 2: SVP Sub-Category (SVP only) -->
+        <div class="col-md-6" id="subCategoryWrapper" style="display:none;">
+          <label class="form-label">SVP Sub-Category <span class="text-danger">*</span></label>
+          <select class="form-select" name="sub_category" id="subCategorySelect" onchange="onSubCatChange()">
+            <option value="" selected disabled>Select sub-category...</option>
+            {% for sc in svp_subcategories %}
+            <option value="{{ sc }}">{{ sc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- STEP 3: Title builders (revealed after type+subcat) -->
+        <div class="col-12" id="titleSection" style="display:none;">
+          <label class="form-label">Document Title <span class="text-danger">*</span></label>
+
+          <!-- Diesel builder -->
+          <div id="titleBuilder_diesel" class="title-builder" style="display:none;">
+            <div class="builder-hint"><i class="fa fa-wand-magic-sparkles me-1"></i> Select vehicle, period type, and date — title will auto-build below.</div>
+            <div class="row g-2 mt-1">
+              <div class="col-md-4">
+                <label class="form-label small mb-1">Vehicle / Equipment <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="diesel_vehicle" onchange="handleDieselVehicle()">
+                  <option value="">-- select --</option>
+                  <option value="OLD PTV AMBULANCE">Old PTV Ambulance</option>
+                  <option value="NEW PTV AMBULANCE">New PTV Ambulance</option>
+                  <option value="BACKHOE">Backhoe</option>
+                  <option value="DUMP TRUCK">Dump Truck</option>
+                  <option value="GARBAGE TRUCK">Garbage Truck</option>
+                  <option value="FIRE TRUCK">Fire Truck</option>
+                  <option value="PATROL VEHICLE">Patrol Vehicle</option>
+                  <option value="custom">+ Custom vehicle...</option>
+                </select>
+                <input type="text" class="form-control form-control-sm mt-1" id="diesel_vehicle_custom"
+                       placeholder="Type vehicle name..." style="display:none;" oninput="buildDieselTitle()">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label small mb-1">Period Type <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="diesel_period_type" onchange="toggleDieselPeriod()">
+                  <option value="">-- select --</option>
+                  <option value="period">Specific Dates (e.g. Mar 27, 29, 2026)</option>
+                  <option value="month">Whole Month (e.g. March 2026)</option>
+                </select>
+              </div>
+              <div class="col-md-4" id="diesel_period_wrap" style="display:none;">
+                <label class="form-label small mb-1" id="diesel_period_label">Date</label>
+                <input type="text" class="form-control form-control-sm" id="diesel_period_val"
+                       placeholder="" oninput="buildDieselTitle()">
+                <div class="form-text" id="diesel_period_hint" style="font-size:10px;color:#666;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tarpaulin builder -->
+          <div id="titleBuilder_tarpaulin" class="title-builder" style="display:none;">
+            <div class="builder-hint"><i class="fa fa-wand-magic-sparkles me-1"></i> Select purpose and date — title will auto-build below.</div>
+            <div class="row g-2 mt-1">
+              <div class="col-md-6">
+                <label class="form-label small mb-1">Purpose / Event <span class="text-danger">*</span></label>
+                <select class="form-select form-select-sm" id="tarp_purpose" onchange="handleTarpPurpose()">
+                  <option value="">-- select --</option>
+                  <option value="FIESTA CELEBRATION">Fiesta Celebration</option>
+                  <option value="ELECTION AWARENESS DRIVE">Election Awareness Drive</option>
+                  <option value="ENVIRONMENT DAY">Environment Day</option>
+                  <option value="MUNICIPAL SPORTS FEST">Municipal Sports Fest</option>
+                  <option value="DISASTER AWARENESS CAMPAIGN">Disaster Awareness Campaign</option>
+                  <option value="custom">+ Custom purpose...</option>
+                </select>
+                <input type="text" class="form-control form-control-sm mt-1" id="tarp_purpose_custom"
+                       placeholder="Type purpose..." style="display:none;" oninput="buildTarpaulinTitle()">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label small mb-1">Date / Year <span class="text-muted">(optional)</span></label>
+                <input type="text" class="form-control form-control-sm" id="tarp_date"
+                       placeholder="e.g. April 2026" oninput="buildTarpaulinTitle()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Events hint -->
+          <div id="titleBuilder_events" class="title-builder" style="display:none;">
+            <div class="builder-hint"><i class="fa fa-pen me-1"></i> Events and Seminars — type the full title manually below.</div>
+          </div>
+
+          <!-- Bidding hint -->
+          <div id="titleBuilder_bidding" class="title-builder" style="display:none;">
+            <div class="builder-hint"><i class="fa fa-pen me-1"></i> Bidding — type the full title manually below.</div>
+          </div>
+
+          <input type="text" class="form-control mt-2" name="title" id="titleInput" required
+                 placeholder="Document title will appear here...">
+          <div class="form-text text-success fw-500" id="titleAutoHint" style="display:none;">
+            <i class="fa fa-check-circle me-1"></i> Title auto-built from selections. You can still edit it.
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="col-md-4" id="amountWrapper" style="display:none;">
+          <label class="form-label">Amount <span class="text-muted fw-normal" style="font-size:11px;">(optional)</span></label>
+          <div class="input-group">
+            <span class="input-group-text">₱</span>
+            <input type="number" class="form-control" name="amount" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+
+        <!-- Priority -->
+        <div class="col-md-4" id="priorityWrapper" style="display:none;">
+          <label class="form-label">Priority</label>
+          <select class="form-select" name="priority">
+            <option value="Normal" selected>Normal</option>
+            <option value="Urgent">Urgent</option>
+            <option value="Routine">Routine</option>
+          </select>
+        </div>
+
+        <!-- Remarks -->
+        <div class="col-12" id="remarksWrapper" style="display:none;">
+          <label class="form-label">Details <span class="text-muted fw-normal" style="font-size:11px;">(optional)</span></label>
+          <textarea class="form-control" name="remarks" rows="3" placeholder="Additional notes or instructions..."></textarea>
+        </div>
+
+        <!-- Submit -->
+        <div class="col-12" id="submitWrapper" style="display:none;">
+          <div class="d-flex gap-2 mt-2">
+            <button type="submit" class="btn-gov"><i class="fa fa-plus me-1"></i>Create Document</button>
+            <a href="{{ url_for('main.documents') }}" class="btn-gov-outline">Cancel</a>
+          </div>
+        </div>
+
+      </div>
+    </form>
+  </div>
+</div>
+
+<style>
+.title-builder { background:#f8f9fa; border:1px solid #e2e8f0; border-radius:8px; padding:12px 14px; margin-bottom:6px; }
+.builder-hint  { font-size:12px; color:#4a6fa5; font-weight:500; }
+</style>
+
+<script>
+const LOWER_IDS = ['titleSection','amountWrapper','priorityWrapper','remarksWrapper','submitWrapper'];
+
+function showAll()  { LOWER_IDS.forEach(id => document.getElementById(id).style.display = ''); }
+function hideAll()  { LOWER_IDS.forEach(id => document.getElementById(id).style.display = 'none'); }
+
+function onTypeChange() {
+  const type   = document.getElementById('docTypeSelect').value;
+  const subSel = document.getElementById('subCategorySelect');
+  subSel.value = ''; subSel.required = false;
+  document.getElementById('subCategoryWrapper').style.display = (type === 'SVP') ? '' : 'none';
+  hideAll();
+  if (type === 'SVP') {
+    subSel.required = true;
+  } else {
+    showTitleSection(type, null);
+  }
+}
+
+function onSubCatChange() {
+  const type   = document.getElementById('docTypeSelect').value;
+  const subCat = document.getElementById('subCategorySelect').value;
+  if (subCat) showTitleSection(type, subCat);
+}
+
+function showTitleSection(type, subCat) {
+  document.querySelectorAll('.title-builder').forEach(el => el.style.display = 'none');
+  document.getElementById('titleInput').value = '';
+  document.getElementById('titleAutoHint').style.display = 'none';
+
+  if (type === 'SVP') {
+    if (subCat === 'Reimbursement of Diesel')    document.getElementById('titleBuilder_diesel').style.display    = '';
+    if (subCat === 'Reimbursement of Tarpaulin') document.getElementById('titleBuilder_tarpaulin').style.display = '';
+    if (subCat === 'Events and Seminars')         document.getElementById('titleBuilder_events').style.display    = '';
+  } else {
+    document.getElementById('titleBuilder_bidding').style.display = '';
+  }
+  showAll();
+}
+
+// ---- Diesel ----
+function handleDieselVehicle() {
+  const sel = document.getElementById('diesel_vehicle');
+  document.getElementById('diesel_vehicle_custom').style.display = sel.value === 'custom' ? '' : 'none';
+  if (sel.value !== 'custom') buildDieselTitle();
+}
+
+function toggleDieselPeriod() {
+  const pt   = document.getElementById('diesel_period_type').value;
+  const wrap = document.getElementById('diesel_period_wrap');
+  const inp  = document.getElementById('diesel_period_val');
+  inp.value  = '';
+  if (!pt) { wrap.style.display = 'none'; buildDieselTitle(); return; }
+  wrap.style.display = '';
+  if (pt === 'period') {
+    document.getElementById('diesel_period_label').textContent = 'Specific Dates';
+    document.getElementById('diesel_period_hint').textContent  = 'Example: March 27, 29, 2026';
+    inp.placeholder = 'March 27, 29, 2026';
+  } else {
+    document.getElementById('diesel_period_label').textContent = 'Month & Year';
+    document.getElementById('diesel_period_hint').textContent  = 'Example: March 2026';
+    inp.placeholder = 'March 2026';
+  }
+  buildDieselTitle();
+}
+
+function buildDieselTitle() {
+  const vSel    = document.getElementById('diesel_vehicle');
+  const vehicle = vSel.value === 'custom'
+    ? document.getElementById('diesel_vehicle_custom').value.trim().toUpperCase()
+    : vSel.value;
+  const pt     = document.getElementById('diesel_period_type').value;
+  const period = document.getElementById('diesel_period_val').value.trim().toUpperCase();
+
+  let title = 'REIMBURSEMENT OF DIESEL EXPENSES FOR OFFICIAL USE OF';
+  if (vehicle) title += ' ' + vehicle;
+  if (pt === 'period' && period) title += ' FOR THE PERIOD OF ' + period;
+  else if (pt === 'month' && period) title += ' FOR THE MONTH OF ' + period;
+
+  const isComplete = !!(vehicle && pt && period);
+  document.getElementById('titleInput').value = title;
+  document.getElementById('titleAutoHint').style.display = isComplete ? '' : 'none';
+}
+
+// ---- Tarpaulin ----
+function handleTarpPurpose() {
+  const sel = document.getElementById('tarp_purpose');
+  document.getElementById('tarp_purpose_custom').style.display = sel.value === 'custom' ? '' : 'none';
+  if (sel.value !== 'custom') buildTarpaulinTitle();
+}
+
+function buildTarpaulinTitle() {
+  const pSel    = document.getElementById('tarp_purpose');
+  const purpose = pSel.value === 'custom'
+    ? document.getElementById('tarp_purpose_custom').value.trim().toUpperCase()
+    : pSel.value;
+  const dt = document.getElementById('tarp_date').value.trim().toUpperCase();
+
+  let title = 'REIMBURSEMENT OF TARPAULIN EXPENSES FOR';
+  if (purpose) title += ' ' + purpose;
+  if (dt)      title += ' ' + dt;
+
+  document.getElementById('titleInput').value = title;
+  document.getElementById('titleAutoHint').style.display = purpose ? '' : 'none';
+}
+</script>
+{% endblock %}
