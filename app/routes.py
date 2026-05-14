@@ -836,7 +836,7 @@ def reject_document(record_id):
 
 @bp.route("/documents/assign/<int:record_id>", methods=["POST"])
 @login_required
-@role_required("admin")
+@role_required("admin", "staff")
 def assign_document(record_id):
     record = db.session.get(Document, record_id) or abort(404)
     data        = request.get_json() or {}
@@ -894,13 +894,14 @@ def pullout_document(record_id):
 @login_required
 def trace():
     q = request.args.get("q", "").strip()
-    results = []
+    base_q = visible_documents(current_user.department)
     if q:
-        results = (visible_documents(current_user.department)
-                   .filter(or_(Document.document_code.ilike(f"%{q}%"),
-                               Document.title.ilike(f"%{q}%"))).all())
-        for r in results:
-            r._sla = r.sla_info()
+        results = base_q.filter(or_(Document.document_code.ilike(f"%{q}%"),
+                                    Document.title.ilike(f"%{q}%"))).all()
+    else:
+        results = base_q.order_by(Document.datetime.desc()).all()
+    for r in results:
+        r._sla = r.sla_info()
     return render_template("trace.html", q=q, results=results)
 
 
