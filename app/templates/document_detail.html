@@ -336,7 +336,23 @@ document.addEventListener('DOMContentLoaded',function(){
   document.getElementById('confirmTransfer')?.addEventListener('click',function(){
     const dept=document.getElementById('tDept').value;
     const remarks=document.getElementById('tRemarks').value;
-    if(!dept){showMessage('Required','Please select a target department.');return
+    if(!dept){showMessage('Required','Please select a target department.');return;}
+    doPost('/documents/transfer/{{ record.id }}',{to_department:dept,remarks},this,
+      '<i class="fa fa-paper-plane me-1"></i>Send Transfer',
+      d=>{transferModal.hide();showMessage('Success',d.message);setTimeout(()=>location.reload(),900);});
+  });
+
+  document.getElementById('confirmClose')?.addEventListener('click',function(){
+    const remarks=document.getElementById('closeRemarks').value;
+    doPost('/documents/close/{{ record.id }}',{remarks},this,
+      '<i class="fa fa-lock me-1"></i>Close Document',
+      ()=>location.reload());
+  });
+
+  document.getElementById('confirmPulloutBtn')?.addEventListener('click',function(){
+    const dept=document.getElementById('pulloutDept').value;
+    const remarks=document.getElementById('pulloutRemarks').value;
+    if(!dept){showMessage('Required','Please select an office.');return;}
     doPost('/documents/pullout/{{ record.id }}',{to_department:dept,remarks},this,
       '<i class="fa fa-arrow-rotate-left me-1"></i>Confirm Pull Out',
       d=>{pulloutModal.hide();showMessage('Success',d.message);setTimeout(()=>location.reload(),900);});
