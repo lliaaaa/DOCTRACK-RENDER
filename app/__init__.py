@@ -36,6 +36,7 @@ def create_app():
     app.register_blueprint(api_bp)
 
     with app.app_context():
+        db.create_all()  # creates all tables if they don't exist
         try:
             _seed_data()
         except Exception as e:
