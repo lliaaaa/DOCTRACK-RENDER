@@ -36,9 +36,10 @@ def create_app():
     app.register_blueprint(api_bp)
 
     with app.app_context():
-        # db.create_all() is NOT called here — use `flask db upgrade` via migrations.
-        # We only seed reference data (departments, users, doc types, statuses).
-        _seed_data()
+        try:
+            _seed_data()
+        except Exception as e:
+            app.logger.warning(f"Seed skipped on startup: {e}")
 
     return app
 
