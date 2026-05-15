@@ -14,11 +14,11 @@
       <input type="text" name="q" value="{{ q or '' }}" class="form-control"
              placeholder="Search by Document ID, title, or office..."
              style="max-width:480px;font-size:13px;" autofocus>
-      <button class="btn btn-danger px-4" style="font-size:13px;">
+      <button class="btn-gov" style="font-size:13px;">
         <i class="fa fa-search me-1"></i> Search
       </button>
       {% if q %}
-      <a href="{{ url_for('main.incoming_documents') }}" class="btn btn-outline-secondary" style="font-size:13px;">
+      <a href="{{ url_for('main.incoming_documents') }}" class="btn-gov-outline">
         <i class="fa fa-xmark me-1"></i> Clear
       </a>
       {% endif %}

@@ -51,7 +51,14 @@
             {% else %}<span class="status-badge s-process">{{ record.status }}</span>{% endif %}
           </td>
           <td style="font-size:11px;color:var(--muted);">{{ record.created_at.strftime('%b %d, %Y') if record.created_at else '-' }}</td>
-          <td><a href="{{ url_for('main.document_detail', record_id=record.id) }}" class="btn-sm-action ba-view"><i class="fa fa-eye me-1"></i>View</a></td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{{ url_for('main.document_detail', record_id=record.id) }}" class="btn-sm-action ba-view"><i class="fa fa-eye me-1"></i>View</a>
+              {% if current_user.role == 'user' and record.status != 'Closed' %}
+              <button class="btn-sm-action ba-edit" onclick="openAssignModal({{ record.id }}, '{{ record.document_code }}')" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;"><i class="fa fa-user-plus me-1"></i>Assign</button>
+              {% endif %}
+            </div>
+          </td>
         </tr>
         {% else %}
         <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:32px;font-size:13px;"><i class="fa fa-folder-open fa-lg mb-2 d-block"></i>No documents found.</td></tr>
@@ -64,4 +71,64 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block modals %}
+<!-- ASSIGN MODAL -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-user-plus me-2"></i>Assign Document</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:#666;margin-bottom:12px;">Assigning: <strong id="assignDocCode" style="font-family:monospace;color:var(--gov-red);"></strong></p>
+        <div class="mb-3">
+          <label class="form-label" style="font-size:13px;font-weight:600;">Assign To</label>
+          <select class="form-select" id="assignToSelect" style="font-size:13px;">
+            <option value="">-- Select staff --</option>
+            {% for u in dept_users %}
+            <option value="{{ u.user_id }}">{{ u.full_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:13px;font-weight:600;">Instructions / Remarks</label>
+          <textarea class="form-control" id="assignRemarks" rows="2" placeholder="Optional instructions..." style="font-size:13px;"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-gov" id="assignSubmitBtn" onclick="submitAssign()"><i class="fa fa-check me-1"></i>Assign</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+let _assignModal, _assignRecordId;
+document.addEventListener('DOMContentLoaded', () => { _assignModal = new bootstrap.Modal(document.getElementById('assignModal')); });
+function openAssignModal(recordId, docCode) {
+  _assignRecordId = recordId;
+  document.getElementById('assignDocCode').textContent = docCode;
+  document.getElementById('assignToSelect').value = '';
+  document.getElementById('assignRemarks').value = '';
+  _assignModal.show();
+}
+function submitAssign() {
+  const to = document.getElementById('assignToSelect').value;
+  const remarks = document.getElementById('assignRemarks').value;
+  if (!to) { alert('Please select a staff member.'); return; }
+  const btn = document.getElementById('assignSubmitBtn');
+  btn.disabled = true;
+  fetch(`/documents/assign/${_assignRecordId}`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({assigned_to: to, remarks})
+  }).then(r => r.json()).then(d => {
+    _assignModal.hide();
+    location.reload();
+  }).catch(() => { btn.disabled = false; alert('Error, try again.'); });
+}
+</script>
 {% endblock %}

@@ -2,11 +2,11 @@
 {% block content %}
 <style>
 .trace-box { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 20px; }
-.trace-result { border-left: 4px solid #b71c1c; padding: 16px 20px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 15px; }
+.trace-result { border-left: 4px solid var(--gov-red); padding: 16px 20px; background: #fff; border-radius: 0 8px 8px 0; box-shadow: 0 2px 6px rgba(0,0,0,.06); margin-bottom: 15px; }
 .timeline { list-style: none; padding: 0; margin: 16px 0 0; position: relative; padding-left: 24px; }
 .timeline::before { content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: #dee2e6; }
 .timeline li { position: relative; padding: 8px 0 8px 18px; font-size: 13px; color: #444; }
-.timeline li::before { content: ''; position: absolute; left: -4px; top: 14px; width: 12px; height: 12px; border-radius: 50%; background: #b71c1c; border: 2px solid white; box-shadow: 0 0 0 2px #b71c1c; }
+.timeline li::before { content: ''; position: absolute; left: -4px; top: 14px; width: 12px; height: 12px; border-radius: 50%; background: var(--gov-red); border: 2px solid white; box-shadow: 0 0 0 2px var(--gov-red); }
 .timeline li .ts { font-size: 11px; color: #aaa; display: block; margin-top: 2px; }
 .badge-status { padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
 .s-closed { background: #e2e3e5; color: #383d41; }
@@ -29,27 +29,24 @@
       <input type="text" name="q" value="{{ q or '' }}" class="form-control"
              placeholder="Enter Document ID (e.g. DOC-A1B2C3D4) or title keyword..."
              style="max-width:480px;" autofocus>
-      <button class="btn btn-danger px-4">
+      <button class="btn-gov">
         <i class="fa fa-search me-1"></i> Search
       </button>
       {% if q %}
-      <a href="{{ url_for('main.trace') }}" class="btn btn-outline-secondary">Clear</a>
+      <a href="{{ url_for('main.trace') }}" class="btn-gov-outline">Clear</a>
       {% endif %}
     </form>
   </div>
 
-  {% if not results and q %}
+  {% if q %}
+    {% if not results %}
       <div class="trace-box text-center" style="color:#999;padding:40px;">
         <i class="fa fa-search fa-2x mb-3" style="color:#ddd;"></i>
         <p>No documents found matching "<strong>{{ q }}</strong>".</p>
       </div>
-  {% elif results %}
+    {% else %}
       <p style="color:#666;font-size:13px;margin-bottom:12px;">
-        {% if q %}
-          Found <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }} matching "<strong>{{ q }}</strong>"
-        {% else %}
-          Showing all <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }}
-        {% endif %}
+        Found <strong>{{ results|length }}</strong> document{{ 's' if results|length != 1 else '' }} matching "<strong>{{ q }}</strong>"
       </p>
 
       {% for r in results %}
@@ -57,7 +54,7 @@
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
           <div>
             <h5 class="mb-1" style="font-size:16px;">
-              <strong style="color:#b71c1c;">{{ r.document_code }}</strong> — {{ r.title }}
+              <strong style="color:var(--gov-red);">{{ r.document_code }}</strong> — {{ r.title }}
             </h5>
             <div class="d-flex gap-3 flex-wrap" style="font-size:13px;color:#555;">
               <span><i class="fa fa-file me-1"></i>{{ r.doc_type }}</span>
@@ -81,6 +78,7 @@
         </div>
       </div>
       {% endfor %}
+    {% endif %}
   {% endif %}
 </div>
 {% endblock %}
