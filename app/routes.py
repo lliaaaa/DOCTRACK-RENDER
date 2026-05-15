@@ -11,7 +11,8 @@ from sqlalchemy.orm import aliased
 from . import db
 from .models import (Document, Department, Transaction, User, Account,
                      DocumentType, DocumentStatus, CitizenCharterConfig,
-                     DEFAULT_SLA, TRANSACTION_CATEGORIES, generate_document_code)
+                     DEFAULT_SLA, TRANSACTION_CATEGORIES, generate_document_code,
+                     SVPWorkflowStep)
 from .decorators import role_required
 
 bp = Blueprint("main", __name__)
@@ -44,17 +45,28 @@ SVP_SUBCATEGORIES = [
 ]
 SVP_STATUS_ORDER = [s for s, _ in SVP_WORKFLOW]
 
+def get_db_svp_workflow():
+    """Load SVP workflow from DB; fall back to hardcoded SVP_WORKFLOW if table empty."""
+    steps = SVPWorkflowStep.query.order_by(SVPWorkflowStep.step_order).all()
+    if steps:
+        return [(s.status_name, s.department_name or None) for s in steps]
+    return SVP_WORKFLOW
+
 def is_svp_doc(record) -> bool:
     return bool(record.doc_type_rel and record.doc_type_rel.type_name == SVP_TYPE_NAME)
 
 def get_svp_next_step(current_status: str):
-    # If doc is in initial placeholder state, first step is index 0
+    workflow = get_db_svp_workflow()
+    status_order = [s for s, _ in workflow]
     if current_status == SVP_INITIAL_STATUS:
-        return SVP_WORKFLOW[0]
-    try: idx = SVP_STATUS_ORDER.index(current_status)
-    except ValueError: return None
-    if idx + 1 >= len(SVP_WORKFLOW): return None
-    return SVP_WORKFLOW[idx + 1]
+        return workflow[0] if workflow else None
+    try:
+        idx = status_order.index(current_status)
+    except ValueError:
+        return None
+    if idx + 1 >= len(workflow):
+        return None
+    return workflow[idx + 1]
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -247,7 +259,8 @@ def documents():
             records_q = records_q.filter(
                 or_(Document.document_code.ilike(f"%{q}%"), Document.title.ilike(f"%{q}%")))
     records = records_q.order_by(Document.datetime.desc()).all()
-    return render_template("documents.html", records=records, q=q, status_filter=status_filter)
+    dept_users = get_dept_users(current_user.department, active_only=True)
+    return render_template("documents.html", records=records, q=q, status_filter=status_filter, dept_users=dept_users)
 
 
 @bp.route("/documents/<int:record_id>")
@@ -836,7 +849,7 @@ def reject_document(record_id):
 
 @bp.route("/documents/assign/<int:record_id>", methods=["POST"])
 @login_required
-@role_required("admin", "user")
+@role_required("admin")
 def assign_document(record_id):
     record = db.session.get(Document, record_id) or abort(404)
     data        = request.get_json() or {}
@@ -894,14 +907,13 @@ def pullout_document(record_id):
 @login_required
 def trace():
     q = request.args.get("q", "").strip()
-    base_q = visible_documents(current_user.department)
+    results = []
     if q:
-        results = base_q.filter(or_(Document.document_code.ilike(f"%{q}%"),
-                                    Document.title.ilike(f"%{q}%"))).all()
-    else:
-        results = base_q.order_by(Document.datetime.desc()).all()
-    for r in results:
-        r._sla = r.sla_info()
+        results = (visible_documents(current_user.department)
+                   .filter(or_(Document.document_code.ilike(f"%{q}%"),
+                               Document.title.ilike(f"%{q}%"))).all())
+        for r in results:
+            r._sla = r.sla_info()
     return render_template("trace.html", q=q, results=results)
 
 
@@ -1099,10 +1111,56 @@ def office_settings():
     doc_statuses = DocumentStatus.query.order_by(DocumentStatus.name).all()
     staff_count  = Account.query.join(User).filter(
         User.department_id == get_dept_id(current_user.department)).count()
+    all_departments = Department.query.order_by(Department.department_name).all()
+    db_steps = SVPWorkflowStep.query.order_by(SVPWorkflowStep.step_order).all()
+    svp_workflow_steps = [s.to_dict() for s in db_steps] if db_steps else \
+        [{"id": None, "step_order": i, "status_name": s, "department_name": d or ""}
+         for i, (s, d) in enumerate(SVP_WORKFLOW)]
     return render_template("office_settings.html", doc_types=doc_types,
                            doc_statuses=doc_statuses, staff_count=staff_count,
                            svp_subcategories=SVP_SUBCATEGORIES,
-                           svp_workflow=[s for s, _ in SVP_WORKFLOW])
+                           svp_workflow=[s for s, _ in SVP_WORKFLOW],
+                           svp_workflow_steps=svp_workflow_steps,
+                           all_departments=all_departments)
+
+
+# ---------------------------------------------------------------------------
+# SVP Workflow Configuration API
+# ---------------------------------------------------------------------------
+
+@bp.route("/api/svp-workflow", methods=["GET"])
+@login_required
+@role_required("admin")
+def api_get_svp_workflow():
+    steps = SVPWorkflowStep.query.order_by(SVPWorkflowStep.step_order).all()
+    if steps:
+        return jsonify([s.to_dict() for s in steps])
+    return jsonify([{"id": None, "step_order": i, "status_name": s, "department_name": d or ""}
+                    for i, (s, d) in enumerate(SVP_WORKFLOW)])
+
+@bp.route("/api/svp-workflow/save", methods=["POST"])
+@login_required
+@role_required("admin")
+def api_save_svp_workflow():
+    data = request.get_json()
+    if not data or not isinstance(data, list):
+        return jsonify({"error": "Invalid data"}), 400
+    SVPWorkflowStep.query.delete()
+    for i, step in enumerate(data):
+        sname = (step.get("status_name") or "").strip()
+        dname = (step.get("department_name") or "").strip() or None
+        if sname:
+            db.session.add(SVPWorkflowStep(step_order=i, status_name=sname, department_name=dname))
+    db.session.commit()
+    return jsonify({"success": True, "count": len(data)})
+
+@bp.route("/api/svp-workflow/reset", methods=["POST"])
+@login_required
+@role_required("admin")
+def api_reset_svp_workflow():
+    SVPWorkflowStep.query.delete()
+    db.session.commit()
+    return jsonify({"success": True})
 
 
 # ---------------------------------------------------------------------------

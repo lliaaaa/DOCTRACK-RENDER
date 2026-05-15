@@ -246,3 +246,19 @@ class Transaction(db.Model):
         return self.handler.full_name if self.handler else None
     @property
     def timestamp(self): return self.datetime
+
+
+class SVPWorkflowStep(db.Model):
+    __tablename__ = 'svp_workflow_steps'
+    id            = db.Column(db.Integer, primary_key=True)
+    step_order    = db.Column(db.Integer, nullable=False)
+    status_name   = db.Column(db.String(100), nullable=False)
+    department_name = db.Column(db.String(100), nullable=True)  # None = requesting office (Closed)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'step_order': self.step_order,
+            'status_name': self.status_name,
+            'department_name': self.department_name or ''
+        }
