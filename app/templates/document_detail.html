@@ -103,7 +103,7 @@
         </form>
       </div>
       {% endif %}
-      {% if current_user.role == 'user' and record.status != 'Closed' and record.status != 'Assigned' %}
+      {% if current_user.role == 'user' and record.status != 'Closed' %}
       <div class="d-flex gap-2 flex-wrap mt-3" style="padding-top:14px;border-top:1px solid #EDE8E0;">
         <button class="btn-sm-action ba-edit" onclick="openAssign()" style="background:#EFF6FF;color:#1D4ED8;border-color:#BFDBFE;"><i class="fa fa-user-plus me-1"></i>Assign</button>
       </div>
