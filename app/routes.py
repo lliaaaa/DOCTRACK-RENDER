@@ -46,7 +46,6 @@ SVP_SUBCATEGORIES = [
 SVP_STATUS_ORDER = [s for s, _ in SVP_WORKFLOW]
 
 def get_db_svp_workflow():
-    """Load SVP workflow from DB; fall back to hardcoded SVP_WORKFLOW if table empty."""
     steps = SVPWorkflowStep.query.order_by(SVPWorkflowStep.step_order).all()
     if steps:
         return [(s.status_name, s.department_name or None) for s in steps]
@@ -550,13 +549,37 @@ def incoming_documents():
             or ql in (h.document.title or "").lower()
             or ql in (h.origin or "").lower()]
 
-    # Attach SLA info to pending transfers
+    # Attach SLA info and waiting time to pending transfers
     for h in pending_transfers:
         h._sla = h.document.sla_info()
+        sent_dt = h.datetime
+        if sent_dt:
+            sent_utc = sent_dt.replace(tzinfo=timezone.utc) if sent_dt.tzinfo is None else sent_dt
+            diff = datetime.now(timezone.utc) - sent_utc
+            total_mins = int(diff.total_seconds() / 60)
+            if total_mins < 60:
+                h._waiting = f"{total_mins}m"
+            elif total_mins < 1440:
+                h._waiting = f"{total_mins // 60}h {total_mins % 60}m"
+            else:
+                h._waiting = f"{total_mins // 1440}d {(total_mins % 1440) // 60}h"
+        else:
+            h._waiting = "—"
+
+    tier_dict = {"On Time": 0, "Warning": 0, "Overdue": 0}
+    for h in pending_transfers:
+        tier = h._sla.get("tier_label", "On Time") if h._sla else "On Time"
+        if "overdue" in tier.lower() or h._sla.get("tier") == "red":
+            tier_dict["Overdue"] += 1
+        elif "warn" in tier.lower() or h._sla.get("tier") == "yellow":
+            tier_dict["Warning"] += 1
+        else:
+            tier_dict["On Time"] += 1
 
     return render_template("incoming_doc.html", records=records,
                            pending_transfers=pending_transfers,
-                           transfer_history=transfer_history, q=q)
+                           transfer_history=transfer_history, q=q,
+                           tier_dict=tier_dict)
 
 
 @bp.route("/outgoing")
@@ -849,7 +872,7 @@ def reject_document(record_id):
 
 @bp.route("/documents/assign/<int:record_id>", methods=["POST"])
 @login_required
-@role_required("admin")
+@role_required("admin", "user")
 def assign_document(record_id):
     record = db.session.get(Document, record_id) or abort(404)
     data        = request.get_json() or {}
@@ -907,13 +930,16 @@ def pullout_document(record_id):
 @login_required
 def trace():
     q = request.args.get("q", "").strip()
-    results = []
+    base_q = visible_documents(current_user.department)
     if q:
-        results = (visible_documents(current_user.department)
-                   .filter(or_(Document.document_code.ilike(f"%{q}%"),
-                               Document.title.ilike(f"%{q}%"))).all())
-        for r in results:
-            r._sla = r.sla_info()
+        results = base_q.filter(or_(
+            Document.document_code.ilike(f"%{q}%"),
+            Document.title.ilike(f"%{q}%")
+        )).all()
+    else:
+        results = base_q.order_by(Document.datetime.desc()).all()
+    for r in results:
+        r._sla = r.sla_info()
     return render_template("trace.html", q=q, results=results)
 
 
@@ -1128,16 +1154,6 @@ def office_settings():
 # SVP Workflow Configuration API
 # ---------------------------------------------------------------------------
 
-@bp.route("/api/svp-workflow", methods=["GET"])
-@login_required
-@role_required("admin")
-def api_get_svp_workflow():
-    steps = SVPWorkflowStep.query.order_by(SVPWorkflowStep.step_order).all()
-    if steps:
-        return jsonify([s.to_dict() for s in steps])
-    return jsonify([{"id": None, "step_order": i, "status_name": s, "department_name": d or ""}
-                    for i, (s, d) in enumerate(SVP_WORKFLOW)])
-
 @bp.route("/api/svp-workflow/save", methods=["POST"])
 @login_required
 @role_required("admin")
@@ -1152,7 +1168,7 @@ def api_save_svp_workflow():
         if sname:
             db.session.add(SVPWorkflowStep(step_order=i, status_name=sname, department_name=dname))
     db.session.commit()
-    return jsonify({"success": True, "count": len(data)})
+    return jsonify({"success": True})
 
 @bp.route("/api/svp-workflow/reset", methods=["POST"])
 @login_required
@@ -1161,6 +1177,40 @@ def api_reset_svp_workflow():
     SVPWorkflowStep.query.delete()
     db.session.commit()
     return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Reports Export
+# ---------------------------------------------------------------------------
+
+@bp.route("/reports/export")
+@login_required
+@role_required("admin")
+def export_reports():
+    from flask import Response
+    date_from = request.args.get("from", "").strip()
+    date_to   = request.args.get("to",   "").strip()
+    records_q = visible_documents(current_user.department)
+    if date_from:
+        try: records_q = records_q.filter(Document.datetime >= datetime.strptime(date_from, "%Y-%m-%d"))
+        except ValueError: pass
+    if date_to:
+        try: records_q = records_q.filter(Document.datetime <= datetime.strptime(date_to, "%Y-%m-%d"))
+        except ValueError: pass
+    records = records_q.order_by(Document.datetime.desc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Document Code","Title","Type","Status","Department","Amount (PHP)","Date Created","SLA Tier"])
+    for r in records:
+        sla = r.sla_info()
+        writer.writerow([r.document_code, r.title, r.doc_type, r.status,
+                         r.department, r.amount or "", 
+                         r.datetime.strftime("%Y-%m-%d %H:%M") if r.datetime else "",
+                         sla.get("tier_label","")])
+    output.seek(0)
+    fname = f"doctrack_report_{datetime.now().strftime('%Y%m%d')}.csv"
+    return Response(output.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={fname}"})
 
 
 # ---------------------------------------------------------------------------
