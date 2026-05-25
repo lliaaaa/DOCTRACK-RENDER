@@ -16,7 +16,14 @@
 @media(max-width:768px){ .chart-grid { grid-template-columns:1fr; } }
 .chart-box { background:white; border-radius:8px; padding:18px; border:1px solid var(--border); box-shadow:0 1px 4px rgba(0,0,0,.06); }
 .chart-box h4 { font-family:var(--serif); font-size:13px; font-weight:700; color:#3C3028; margin-bottom:12px; border-bottom:1px solid #EDE8E0; padding-bottom:8px; }
+.chart-box h4 { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px; }
+.ctype-btns button { font-size:10px; padding:1px 7px; border-radius:3px; border:1px solid #ddd; background:#f8f8f8; cursor:pointer; margin-left:2px; }
+.ctype-btns button.act { background:var(--gov-red); color:white; border-color:var(--gov-red); }
 canvas { max-height:220px; }
+@media print {
+  .sidebar,.header,form,.btn-gov,.btn-gov-outline,.no-print { display:none!important; }
+  .chart-box,.rpt-stat,.gov-card { break-inside:avoid; }
+}
 .sum-table { width:100%; border-collapse:collapse; }
 .sum-table th { background:#F5F0E8; font-size:11px; text-transform:uppercase; font-weight:700; color:var(--muted); padding:9px 12px; border-bottom:2px solid #EDE8E0; }
 .sum-table td { padding:8px 12px; font-size:13px; border-bottom:1px solid #F5F0EB; }
@@ -27,7 +34,13 @@ canvas { max-height:220px; }
 
 <div class="content">
   <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
-    <h1 class="dashboard-title">Summary Reports</h1>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+      <h1 class="dashboard-title">Summary Reports</h1>
+      <div class="d-flex gap-2 no-print">
+        <button onclick="window.print()" class="btn-gov-outline" style="font-size:12px;"><i class="fa fa-print me-1"></i>Print / PDF</button>
+        <a href="{{ url_for('main.export_reports') }}" class="btn-gov" style="font-size:12px;"><i class="fa fa-download me-1"></i>Export CSV</a>
+      </div>
+    </div>
     <div style="font-size:12px;color:var(--muted);margin-top:2px;">Document statistics for <strong>{{ current_user.department }}</strong></div>
   </div>
 
@@ -161,23 +174,23 @@ canvas { max-height:220px; }
   <!-- CHARTS -->
   <div class="chart-grid mb-4">
     <div class="chart-box">
-      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>By Document Type</h4>
+      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>By Document Type<span class="ctype-btns"><button onclick="toggleChart('typeChart','pie',this)" class="act">Pie</button><button onclick="toggleChart('typeChart','bar',this)" >Bar</button><button onclick="toggleChart('typeChart','doughnut',this)" >Donut</button></span></h4>
       <canvas id="typeChart"></canvas>
     </div>
     <div class="chart-box">
-      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Status</h4>
+      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Status<span class="ctype-btns"><button onclick="toggleChart('statusChart','bar',this)" class="act">Bar</button><button onclick="toggleChart('statusChart','pie',this)" >Pie</button><button onclick="toggleChart('statusChart','doughnut',this)" >Donut</button></span></h4>
       <canvas id="statusChart"></canvas>
     </div>
     <div class="chart-box">
-      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>SLA Tier Distribution (Active)</h4>
+      <h4><i class="fa fa-chart-pie fa-xs me-1"></i>SLA Tier Distribution (Active)<span class="ctype-btns"><button onclick="toggleChart('tierChart','doughnut',this)" class="act">Donut</button><button onclick="toggleChart('tierChart','pie',this)" >Pie</button><button onclick="toggleChart('tierChart','bar',this)" >Bar</button></span></h4>
       <canvas id="tierChart"></canvas>
     </div>
     <div class="chart-box">
-      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Department</h4>
+      <h4><i class="fa fa-chart-bar fa-xs me-1"></i>By Department<span class="ctype-btns"><button onclick="toggleChart('deptChart','bar',this)" class="act">Bar</button><button onclick="toggleChart('deptChart','pie',this)" >Pie</button><button onclick="toggleChart('deptChart','doughnut',this)" >Donut</button></span></h4>
       <canvas id="deptChart"></canvas>
     </div>
     <div class="chart-box" style="grid-column:span 2;">
-      <h4><i class="fa fa-chart-line fa-xs me-1"></i>Monthly Document Volume</h4>
+      <h4><i class="fa fa-chart-line fa-xs me-1"></i>Monthly Document Volume<span class="ctype-btns"><button onclick="toggleChart('monthlyChart','line',this)" class="act">Line</button><button onclick="toggleChart('monthlyChart','bar',this)" >Bar</button></span></h4>
       <canvas id="monthlyChart" style="max-height:160px;"></canvas>
     </div>
     {% if subcat_summary %}
@@ -298,10 +311,12 @@ canvas { max-height:220px; }
 <script>
 const palette = ['#8B1A1A','#1A3A6B','#584f4d','#FF9800','#2E7D32','#6A1B9A','#00838F','#C62828','#E65100'];
 
-function makeChart(id, type, labels, data, color) {
-  const ctx = document.getElementById(id);
-  if (!ctx || !labels.length) return;
-  new Chart(ctx, {
+const _cs={};
+function makeChart(id,type,labels,data,color){
+  const ctx=document.getElementById(id);
+  if(!ctx||!labels.length)return;
+  Chart.getChart(ctx)?.destroy();
+  new Chart(ctx,{
     type,
     data: { labels, datasets: [{ data, backgroundColor: type==='pie'||type==='doughnut' ? palette : color,
       borderColor: type!=='pie'&&type!=='doughnut' ? color : undefined,
@@ -314,6 +329,13 @@ function makeChart(id, type, labels, data, color) {
         x:{ticks:{font:{size:11}},grid:{display:false}} } : {}
     }
   });
+  _cs[id]={labels,data,color};
+}
+function toggleChart(id,newType,btn){
+  const s=_cs[id];if(!s)return;
+  btn.closest('.ctype-btns').querySelectorAll('button').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  makeChart(id,newType,s.labels,s.data,s.color);
 }
 
 makeChart('typeChart',    'pie',       {{ type_summary|map(attribute=0)|list|tojson }},   {{ type_summary|map(attribute=1)|list|tojson }},   palette);

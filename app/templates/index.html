@@ -62,7 +62,7 @@ body { font-family: var(--sans); background: var(--bg); color: #1C1410; }
     overflow: hidden; transition: background .15s, color .15s; font-size: 13px;
 }
 .sidebar a:hover { background: rgba(255,255,255,.06); color: #F5F0E8; }
-.sidebar a.active { background: rgba(0,0,0,.25); color: #F5F0E8; font-weight: 600; border-right: 3px solid rgba(255,255,255,.6); }
+.sidebar a.active { background: rgba(0,0,0,.25); color: #F5F0E8; font-weight: 600; border-right: 3px solid rgba(255,255,255,.55); }
 .sidebar a i { min-width: 20px; text-align: center; font-size: 13px; flex-shrink: 0; color: rgba(255,255,255,.6); }
 .sidebar a:hover i, .sidebar a.active i { color: white; }
 .sidebar a .nl { overflow: hidden; text-overflow: ellipsis; }
@@ -240,18 +240,18 @@ tr:hover td { background: #FBF8F5; }
             <i class="fa-solid fa-circle-user" style="font-size:14px;"></i>
             <span>{{ current_user.full_name }}</span>
         </a>
-        <ul class="dropdown-menu dropdown-menu-end" style="font-size:13px;min-width:200px;">
+        <ul class="dropdown-menu dropdown-menu-end" style="font-size:13px;min-width:210px;">
             <li><span class="dropdown-item-text text-muted small">{{ current_user.department }}</span></li>
             <li><hr class="dropdown-divider"></li>
             <li>
               <div class="dropdown-item-text" style="padding:6px 12px;">
-                <div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"><i class="fa fa-palette me-1"></i>Color Theme</div>
-                <div style="display:flex;gap:7px;flex-wrap:wrap;">
-                  <button onclick="setTheme('red')"   title="Classic Red"   style="width:22px;height:22px;border-radius:50%;background:#b71c1c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="red"></button>
-                  <button onclick="setTheme('slate')" title="Dark Slate"    style="width:22px;height:22px;border-radius:50%;background:#334155;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="slate"></button>
-                  <button onclick="setTheme('warm')"  title="Warm Gray"     style="width:22px;height:22px;border-radius:50%;background:#78716c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="warm"></button>
-                  <button onclick="setTheme('cool')"  title="Cool Gray"     style="width:22px;height:22px;border-radius:50%;background:#6b7280;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="cool"></button>
-                  <button onclick="setTheme('sand')"  title="Sand"          style="width:22px;height:22px;border-radius:50%;background:#92806a;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="sand"></button>
+                <div style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"><i class="fa fa-palette me-1"></i>Color Theme</div>
+                <div style="display:flex;gap:7px;align-items:center;">
+                  <button onclick="setTheme('red')"     title="Classic Red"   style="width:22px;height:22px;border-radius:50%;background:#b71c1c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="red"></button>
+                  <button onclick="setTheme('slate')"   title="Dark Slate"    style="width:22px;height:22px;border-radius:50%;background:#334155;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="slate"></button>
+                  <button onclick="setTheme('warm')"    title="Warm Gray"     style="width:22px;height:22px;border-radius:50%;background:#78716c;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="warm"></button>
+                  <button onclick="setTheme('cool')"    title="Cool Gray"     style="width:22px;height:22px;border-radius:50%;background:#6b7280;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="cool"></button>
+                  <button onclick="setTheme('sand')"    title="Sand"          style="width:22px;height:22px;border-radius:50%;background:#92806a;border:2px solid transparent;cursor:pointer;" class="theme-swatch" data-theme="sand"></button>
                 </div>
               </div>
             </li>
@@ -279,6 +279,8 @@ tr:hover td { background: #FBF8F5; }
     {% endwith %}
     {% block content %}{% endblock %}
 </div>
+
+{% block modals %}{% endblock %}
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -373,24 +375,24 @@ async function pollNotifications() {
 pollNotifications();
 setInterval(pollNotifications, 30000); // Poll every 30s
 
-// ── Color Theme Switcher ──────────────────────────────────────────────
+// ── Color Theme Switcher ─────────────────────────────────────────────────
 const THEMES = {
-  red:     { primary:'#b71c1c', dark:'#8f0707', mid:'#c62828', sidebar:'#5c0a0a', bg:'#F0EDE8', light:'#FEE8E8', border:'#FACACA' },
-  slate:   { primary:'#475569', dark:'#334155', mid:'#64748b', sidebar:'#1e293b', bg:'#F1F5F9', light:'#E8ECF2', border:'#C8D0DC' },
-  warm:    { primary:'#78716c', dark:'#57534e', mid:'#a8a29e', sidebar:'#3d3734', bg:'#F5F2EE', light:'#EDEBE8', border:'#D4CEC8' },
-  cool:    { primary:'#6b7280', dark:'#4b5563', mid:'#9ca3af', sidebar:'#374151', bg:'#F3F4F6', light:'#EBEDEF', border:'#CFD3D8' },
-  sand:    { primary:'#92806a', dark:'#6e5f4c', mid:'#b09880', sidebar:'#4a3c2e', bg:'#F7F3EE', light:'#EDE6DE', border:'#D4C8B8' },
+  red:   {primary:'#b71c1c',dark:'#8f0707',mid:'#c62828',sidebar:'#5c0a0a',bg:'#F0EDE8',light:'#FEE8E8',border:'#FACACA'},
+  slate: {primary:'#475569',dark:'#334155',mid:'#64748b',sidebar:'#1e293b',bg:'#F1F5F9',light:'#E8ECF2',border:'#C8D0DC'},
+  warm:  {primary:'#78716c',dark:'#57534e',mid:'#a8a29e',sidebar:'#3d3734',bg:'#F5F2EE',light:'#EDEBE8',border:'#D4CEC8'},
+  cool:  {primary:'#6b7280',dark:'#4b5563',mid:'#9ca3af',sidebar:'#374151',bg:'#F3F4F6',light:'#EBEDEF',border:'#CFD3D8'},
+  sand:  {primary:'#92806a',dark:'#6e5f4c',mid:'#b09880',sidebar:'#4a3c2e',bg:'#F7F3EE',light:'#EDE6DE',border:'#D4C8B8'},
 };
 function applyTheme(name) {
   const t = THEMES[name] || THEMES.red;
   const r = document.documentElement.style;
-  r.setProperty('--gov-red',      t.primary);
-  r.setProperty('--gov-red-dark', t.dark);
-  r.setProperty('--gov-red-mid',  t.mid);
-  r.setProperty('--bg-sidebar',   t.sidebar);
-  r.setProperty('--bg',           t.bg);
-  r.setProperty('--accent-light', t.light);
-  r.setProperty('--accent-border',t.border);
+  r.setProperty('--gov-red',       t.primary);
+  r.setProperty('--gov-red-dark',  t.dark);
+  r.setProperty('--gov-red-mid',   t.mid);
+  r.setProperty('--bg-sidebar',    t.sidebar);
+  r.setProperty('--bg',            t.bg);
+  r.setProperty('--accent-light',  t.light);
+  r.setProperty('--accent-border', t.border);
   document.querySelectorAll('.theme-swatch').forEach(s => {
     s.style.border = s.dataset.theme === name ? '2px solid #000' : '2px solid transparent';
   });

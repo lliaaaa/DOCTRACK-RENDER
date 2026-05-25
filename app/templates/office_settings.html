@@ -60,22 +60,22 @@
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <div style="font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;">Workflow Steps</div>
             <div style="display:flex;gap:6px;">
-              <button onclick="resetWorkflow()" class="btn-sm-action" style="font-size:11px;background:#FFF3E0;color:#E65100;border-color:#FFB74D;">↩ Reset</button>
-              <button onclick="saveWorkflow()" class="btn-sm-action ba-edit" style="font-size:11px;">💾 Save</button>
+              <button onclick="resetWorkflow()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid #FFB74D;background:#FFF3E0;color:#E65100;cursor:pointer;">↩ Reset</button>
+              <button onclick="saveWorkflow()" style="font-size:11px;padding:2px 8px;border-radius:4px;border:1px solid var(--gov-red);background:var(--gov-red);color:white;cursor:pointer;">💾 Save</button>
             </div>
           </div>
-          <div id="workflowStepList" style="margin-bottom:8px;"></div>
-          <div style="display:flex;gap:6px;margin-top:8px;">
-            <input id="newStepName" class="form-control" style="font-size:12px;flex:1;" placeholder="Step name (e.g. For Signature of Mayor)">
-            <select id="newStepDept" class="form-select" style="font-size:12px;flex:1;">
-              <option value="">— Requesting Office (Closed) —</option>
+          <div id="workflowStepList" style="margin-bottom:8px;min-height:40px;"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <input id="newStepName" class="form-control" style="font-size:12px;flex:1;min-width:140px;" placeholder="Step name">
+            <select id="newStepDept" class="form-select" style="font-size:12px;flex:1;min-width:140px;">
+              <option value="">— Requesting Office (end) —</option>
               {% for dept in all_departments %}
               <option value="{{ dept.department_name }}">{{ dept.department_name }}</option>
               {% endfor %}
             </select>
-            <button onclick="addStep()" class="btn-gov" style="font-size:12px;white-space:nowrap;"><i class="fa fa-plus"></i> Add</button>
+            <button onclick="addStep()" style="font-size:12px;padding:4px 12px;background:var(--gov-red);color:white;border:none;border-radius:5px;cursor:pointer;white-space:nowrap;">+ Add</button>
           </div>
-          <div id="workflowSaveMsg" style="font-size:12px;margin-top:6px;display:none;"></div>
+          <div id="wfMsg" style="font-size:12px;margin-top:6px;display:none;color:green;"></div>
         </div>
       </div>
 
@@ -134,75 +134,64 @@
     </div>
   </div>
 </div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script>
 const INIT_STEPS = {{ svp_workflow_steps | tojson }};
-let steps = INIT_STEPS.map(s => ({ status_name: s.status_name, department_name: s.department_name || '' }));
+let steps = INIT_STEPS.map(s=>({status_name:s.status_name, department_name:s.department_name||''}));
+let _sortable=null;
 
-function renderSteps() {
-  const list = document.getElementById('workflowStepList');
-  list.innerHTML = '';
-  steps.forEach((s, i) => {
-    const row = document.createElement('div');
-    row.className = 'workflow-step';
-    row.dataset.index = i;
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f9f9f9;border-radius:6px;margin-bottom:4px;cursor:grab;border:1px solid #eee;';
-    row.innerHTML = `
-      <span style="color:#aaa;font-size:13px;">⠿</span>
-      <span class="step-num">${i+1}</span>
+function renderSteps(){
+  const list=document.getElementById('workflowStepList');
+  if(_sortable){_sortable.destroy();_sortable=null;}
+  list.innerHTML='';
+  steps.forEach((s,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:8px;padding:6px 8px;background:#f9f9f9;border-radius:6px;margin-bottom:4px;border:1px solid #eee;';
+    row.innerHTML=`<span style="color:#bbb;cursor:grab;font-size:14px;user-select:none;">⠿</span>
+      <span style="min-width:18px;height:18px;border-radius:50%;background:var(--gov-red);color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">${i+1}</span>
       <span style="flex:1;font-size:12px;font-weight:600;">${s.status_name}</span>
-      <span style="font-size:11px;color:#888;background:#eee;padding:1px 7px;border-radius:10px;">${s.department_name || 'Requesting Office'}</span>
-      <button onclick="removeStep(${i})" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:14px;padding:0 2px;">✕</button>
-    `;
+      <span style="font-size:11px;color:#888;background:#eee;padding:1px 7px;border-radius:10px;">${s.department_name||'Requesting Office'}</span>
+      <button onclick="removeStep(${i})" style="background:none;border:none;color:#dc3545;cursor:pointer;font-size:14px;line-height:1;">✕</button>`;
     list.appendChild(row);
   });
-  Sortable.create(list, {
-    animation: 150,
-    handle: '[style*="grab"]',
-    onEnd: (e) => {
-      const moved = steps.splice(e.oldIndex, 1)[0];
-      steps.splice(e.newIndex, 0, moved);
+  _sortable=Sortable.create(list,{
+    animation:150,
+    onEnd(e){
+      const m=steps.splice(e.oldIndex,1)[0];
+      steps.splice(e.newIndex,0,m);
       renderSteps();
     }
   });
 }
 
-function addStep() {
-  const name = document.getElementById('newStepName').value.trim();
-  const dept = document.getElementById('newStepDept').value;
-  if (!name) { alert('Enter a step name.'); return; }
-  steps.push({ status_name: name, department_name: dept });
-  document.getElementById('newStepName').value = '';
-  document.getElementById('newStepDept').value = '';
+function addStep(){
+  const name=document.getElementById('newStepName').value.trim();
+  const dept=document.getElementById('newStepDept').value;
+  if(!name){alert('Enter a step name.');return;}
+  steps.push({status_name:name,department_name:dept});
+  document.getElementById('newStepName').value='';
   renderSteps();
 }
 
-function removeStep(i) {
-  if (!confirm(`Remove step "${steps[i].status_name}"?`)) return;
-  steps.splice(i, 1);
+function removeStep(i){
+  if(!confirm(`Remove "${steps[i].status_name}"?`))return;
+  steps.splice(i,1);
   renderSteps();
 }
 
-function saveWorkflow() {
-  if (!steps.length) { alert('Workflow cannot be empty.'); return; }
-  fetch('/api/svp-workflow/save', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(steps)
-  }).then(r => r.json()).then(d => {
-    const msg = document.getElementById('workflowSaveMsg');
-    msg.style.display = 'block';
-    msg.style.color = 'green';
-    msg.textContent = '✓ Workflow saved! New documents will follow the updated steps.';
-    setTimeout(() => msg.style.display = 'none', 3500);
-  });
+function saveWorkflow(){
+  if(!steps.length){alert('Cannot save empty workflow.');return;}
+  fetch('/api/svp-workflow/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(steps)})
+    .then(r=>r.json()).then(()=>{
+      const m=document.getElementById('wfMsg');
+      m.style.display='block';m.textContent='✓ Workflow saved successfully!';
+      setTimeout(()=>m.style.display='none',3000);
+    });
 }
 
-function resetWorkflow() {
-  if (!confirm('Reset to default workflow?')) return;
-  fetch('/api/svp-workflow/reset', { method: 'POST' })
-    .then(r => r.json()).then(() => location.reload());
+function resetWorkflow(){
+  if(!confirm('Reset to default workflow?'))return;
+  fetch('/api/svp-workflow/reset',{method:'POST'}).then(()=>location.reload());
 }
 
 renderSteps();
