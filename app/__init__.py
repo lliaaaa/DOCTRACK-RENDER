@@ -83,6 +83,25 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        # Stamp Alembic to 'head' after db.create_all() so that flask db upgrade
+        # during build knows all tables are already created and skips safely.
+        # This prevents "column already exists" / "table already exists" errors
+        # on Render when build runs flask db upgrade AFTER the app has already
+        # called db.create_all() on a previous deploy.
+        try:
+            from sqlalchemy import text
+            with db.engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT COUNT(*) FROM alembic_version")
+                ).scalar()
+                if result == 0:
+                    conn.execute(text(
+                        "INSERT INTO alembic_version (version_num) VALUES ('001_initial')"
+                    ))
+                    conn.commit()
+        except Exception:
+            pass  # alembic_version table doesn't exist yet — flask db upgrade will handle it
+
         try:
             _seed_data()
         except Exception as e:
