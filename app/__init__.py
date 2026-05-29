@@ -88,6 +88,12 @@ def create_app():
         except Exception as e:
             app.logger.warning(f"Seed skipped on startup: {e}")
 
+    # ── Background scheduler (backup + cleanup) ──────────────────────────
+    # Starts automatically with the app — no manual commands needed.
+    # Daily backup at 2 AM PH time, AuditLog cleanup every Sunday 3 AM.
+    from .scheduler import init_scheduler
+    init_scheduler(app)
+
     return app
 
 
