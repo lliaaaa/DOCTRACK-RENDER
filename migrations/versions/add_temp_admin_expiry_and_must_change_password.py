@@ -1,7 +1,7 @@
 """Add temp_admin_expires_at and must_change_password to accounts
 
-Revision ID: a1b2c3d4e5f6
-Revises: merge_all_heads_001
+Revision ID: b2c3d4e5f6a1
+Revises: a1b2c3d4e5f6
 Create Date: 2026-05-29
 
 Fixes:
@@ -11,8 +11,8 @@ Fixes:
 from alembic import op
 import sqlalchemy as sa
 
-revision = 'a1b2c3d4e5f6'
-down_revision = 'merge_all_heads_001'
+revision = 'b2c3d4e5f6a1'
+down_revision = 'a1b2c3d4e5f6'
 branch_labels = None
 depends_on = None
 
