@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>DTS – Municipality of Unisan</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -207,6 +208,9 @@ tr:hover td { background: #FBF8F5; }
         <a href="{{ url_for('main.office_settings') }}"><i class="fa-solid fa-gear"></i><span class="nl">Office Settings</span></a>
         <a href="{{ url_for('main.charter_settings') }}"><i class="fa-solid fa-clock-rotate-left"></i><span class="nl">Citizen Charter SLA</span></a>
         <a href="{{ url_for('main.activity_logs') }}"><i class="fa-solid fa-clipboard-list"></i><span class="nl">Activity Logs</span></a>
+        {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('main.security_audit_logs') }}"><i class="fa-solid fa-shield-halved"></i><span class="nl">Security Audit</span></a>
+        {% endif %}
         {% endif %}
     </div>
 </div>
@@ -284,6 +288,14 @@ tr:hover td { background: #FBF8F5; }
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
+// ── CSRF helper ──────────────────────────────────────────────────────────────
+// Returns the CSRF token from the meta tag for use in all fetch() POST calls.
+// Usage: headers: { 'X-CSRFToken': getCsrf() }
+function getCsrf() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+</script>
+<script>
 // Sidebar state persistence
 function toggleSidebar() {
     ['sidebar','mainHeader','mainContent'].forEach(id => document.getElementById(id).classList.toggle('collapsed'));
@@ -322,58 +334,83 @@ updateClock(); setInterval(updateClock, 1000);
 </script>
 
 <script>
+// ── Real-time Notifications — SSE with polling fallback ──────────────────────
+// Uses Server-Sent Events for efficient real-time updates.
+// Falls back to 30-second polling if SSE is unavailable (older browsers / proxy).
+
 const TIER_COLOR = { blue:'#2196F3', green:'#4CAF50', yellow:'#FF9800', red:'#F44336' };
 const TIER_BG    = { blue:'#E3F2FD', green:'#E8F5E9', yellow:'#FFF8E1', red:'#FFEBEE' };
+
+function applyNotificationData(data) {
+  const badge = document.getElementById('pendingBadge');
+  if (badge) {
+    if (data.pending_incoming > 0) { badge.textContent = data.pending_incoming; badge.style.display='inline'; }
+    else badge.style.display = 'none';
+  }
+  const bell = document.getElementById('notifBadge');
+  const total = (data.alerts||[]).length + (data.pending_incoming||0);
+  if (bell) {
+    if (total > 0) { bell.textContent = total > 9 ? '9+' : total; bell.style.display='block'; }
+    else bell.style.display = 'none';
+  }
+  const list = document.getElementById('notifList');
+  if (!list) return;
+  let html = '';
+  if (data.pending_incoming > 0) {
+    html += `<a href="/incoming" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:#E3F2FD;">
+      <span style="font-weight:700;color:#1565C0;"><i class="fa fa-download me-1"></i>${data.pending_incoming} pending transfer${data.pending_incoming>1?'s':''}</span>
+      <span style="display:block;font-size:11px;color:#666;margin-top:1px;">Awaiting receipt in your office</span></a>`;
+  }
+  (data.alerts||[]).forEach(a => {
+    const c = TIER_COLOR[a.tier]||'#999'; const bg = TIER_BG[a.tier]||'#fafafa';
+    const elapsed = a.elapsed_minutes >= 60
+      ? `${(a.elapsed_minutes/60).toFixed(1)}h`
+      : `${a.elapsed_minutes}m`;
+    html += `<a href="/documents/${a.id}" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:${bg};">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-weight:600;font-size:12px;color:#222;">${a.code}</span>
+        <span style="font-size:10px;font-weight:700;color:white;background:${c};border-radius:4px;padding:1px 6px;">${a.tier_label.toUpperCase()}</span>
+      </div>
+      <div style="font-size:11px;color:#555;margin-top:2px;">${a.title.length>40?a.title.slice(0,40)+'…':a.title}</div>
+      <div style="margin-top:4px;background:#e0e0e0;border-radius:4px;height:4px;overflow:hidden;">
+        <div style="height:4px;width:${a.pct}%;background:${c};border-radius:4px;"></div>
+      </div>
+      <div style="font-size:10px;color:#888;margin-top:2px;">${elapsed} elapsed · ${a.hours_left}h remaining</div>
+    </a>`;
+  });
+  if (!html) html = '<div style="padding:12px;color:#aaa;text-align:center;font-size:12px;">No urgent notifications</div>';
+  list.innerHTML = html;
+}
 
 async function pollNotifications() {
   try {
     const res  = await fetch('/api/notifications');
     const data = await res.json();
-    // Sidebar incoming badge
-    const badge = document.getElementById('pendingBadge');
-    if (badge) {
-      if (data.pending_incoming > 0) { badge.textContent = data.pending_incoming; badge.style.display='inline'; }
-      else badge.style.display = 'none';
-    }
-    // Bell badge
-    const bell = document.getElementById('notifBadge');
-    const total = (data.alerts||[]).length + (data.pending_incoming||0);
-    if (bell) {
-      if (total > 0) { bell.textContent = total > 9 ? '9+' : total; bell.style.display='block'; }
-      else bell.style.display = 'none';
-    }
-    // Notification dropdown
-    const list = document.getElementById('notifList');
-    if (!list) return;
-    let html = '';
-    if (data.pending_incoming > 0) {
-      html += `<a href="/incoming" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:#E3F2FD;">
-        <span style="font-weight:700;color:#1565C0;"><i class="fa fa-download me-1"></i>${data.pending_incoming} pending transfer${data.pending_incoming>1?'s':''}</span>
-        <span style="display:block;font-size:11px;color:#666;margin-top:1px;">Awaiting receipt in your office</span></a>`;
-    }
-    (data.alerts||[]).forEach(a => {
-      const c = TIER_COLOR[a.tier]||'#999'; const bg = TIER_BG[a.tier]||'#fafafa';
-      const elapsed = a.elapsed_minutes >= 60
-        ? `${(a.elapsed_minutes/60).toFixed(1)}h`
-        : `${a.elapsed_minutes}m`;
-      html += `<a href="/documents/${a.id}" style="display:block;padding:8px 14px;border-bottom:1px solid #f5f5f5;text-decoration:none;background:${bg};">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-weight:600;font-size:12px;color:#222;">${a.code}</span>
-          <span style="font-size:10px;font-weight:700;color:white;background:${c};border-radius:4px;padding:1px 6px;">${a.tier_label.toUpperCase()}</span>
-        </div>
-        <div style="font-size:11px;color:#555;margin-top:2px;">${a.title.length>40?a.title.slice(0,40)+'…':a.title}</div>
-        <div style="margin-top:4px;background:#e0e0e0;border-radius:4px;height:4px;overflow:hidden;">
-          <div style="height:4px;width:${a.pct}%;background:${c};border-radius:4px;"></div>
-        </div>
-        <div style="font-size:10px;color:#888;margin-top:2px;">${elapsed} elapsed · ${a.hours_left}h remaining</div>
-      </a>`;
-    });
-    if (!html) html = '<div style="padding:12px;color:#aaa;text-align:center;font-size:12px;">No urgent notifications</div>';
-    list.innerHTML = html;
+    applyNotificationData(data);
   } catch(e) { console.warn('Notification poll failed', e); }
 }
-pollNotifications();
-setInterval(pollNotifications, 30000); // Poll every 30s
+
+// Try SSE first; fall back to polling on error or if unsupported
+let _pollingFallback = null;
+if (typeof EventSource !== 'undefined') {
+  const sse = new EventSource('/api/notifications/stream');
+  sse.onmessage = (e) => {
+    try { applyNotificationData(JSON.parse(e.data)); }
+    catch(err) { console.warn('SSE parse error', err); }
+  };
+  sse.onerror = () => {
+    // SSE failed (e.g. proxy timeout) — start polling fallback
+    sse.close();
+    if (!_pollingFallback) {
+      pollNotifications();
+      _pollingFallback = setInterval(pollNotifications, 30000);
+    }
+  };
+} else {
+  // Browser doesn't support SSE — use polling
+  pollNotifications();
+  _pollingFallback = setInterval(pollNotifications, 30000);
+}
 
 // ── Color Theme Switcher ─────────────────────────────────────────────────
 const THEMES = {
@@ -400,5 +437,97 @@ function applyTheme(name) {
 function setTheme(name) { localStorage.setItem('doctrack-theme', name); applyTheme(name); }
 applyTheme(localStorage.getItem('doctrack-theme') || 'red');
 </script>
+<!-- ── Help / Legend Modal ─────────────────────────────────────────────── -->
+{% if current_user.is_authenticated %}
+<button id="helpBtn" onclick="document.getElementById('helpModal').style.display='flex'"
+  style="position:fixed;bottom:24px;right:24px;width:42px;height:42px;border-radius:50%;
+         background:var(--gov-red);color:white;border:none;cursor:pointer;font-size:18px;
+         display:flex;align-items:center;justify-content:center;
+         box-shadow:0 3px 10px rgba(0,0,0,.25);z-index:2000;"
+  title="Help & Legend">
+  <i class="fa fa-question"></i>
+</button>
+
+<div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+     z-index:3000;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:white;border-radius:12px;max-width:520px;width:100%;max-height:90vh;
+              overflow-y:auto;padding:28px 28px 24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h2 style="font-size:17px;font-weight:700;margin:0;">Help &amp; Legend</h2>
+      <button onclick="document.getElementById('helpModal').style.display='none'"
+              style="background:none;border:none;cursor:pointer;font-size:20px;color:#888;">&times;</button>
+    </div>
+
+    <!-- SLA Colors -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+        SLA Status Colors (RA 11032 – Citizen's Charter)
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:14px;height:14px;border-radius:50%;background:#2196F3;flex-shrink:0;"></span>
+          <span style="font-size:13px;"><strong>On Track (Blue)</strong> — Less than 25% of SLA time consumed</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:14px;height:14px;border-radius:50%;background:#4CAF50;flex-shrink:0;"></span>
+          <span style="font-size:13px;"><strong>In Progress (Green)</strong> — 25%–50% of SLA time consumed</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:14px;height:14px;border-radius:50%;background:#FF9800;flex-shrink:0;"></span>
+          <span style="font-size:13px;"><strong>Urgent (Orange)</strong> — 50%–75% of SLA time consumed</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="width:14px;height:14px;border-radius:50%;background:#F44336;flex-shrink:0;"></span>
+          <span style="font-size:13px;"><strong>Critical / Overdue (Red)</strong> — Over 75% or past deadline</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SVP Workflow -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+        SVP Document Workflow
+      </div>
+      <div style="font-size:12px;color:#5C5248;line-height:1.8;">
+        Pending Release →
+        Request for PR (Budget) →
+        Request for PO (Budget) →
+        For Signature BAC Members →
+        For Signature of Mayor →
+        Request for OBR (Budget) →
+        For Accounting Staff Validation →
+        For Processing (Accounting) →
+        With Checked → <strong>Closed</strong>
+      </div>
+    </div>
+
+    <!-- Priority Labels -->
+    <div style="margin-bottom:18px;">
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+        Document Priority
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <span style="background:#E8F5E9;color:#2E7D32;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">ROUTINE</span>
+        <span style="background:#E3F2FD;color:#1565C0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">NORMAL</span>
+        <span style="background:#FFF8E1;color:#E65100;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;">URGENT</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#888;margin-bottom:8px;">
+        Quick Actions Reference
+      </div>
+      <div style="font-size:12px;color:#5C5248;line-height:2;">
+        <strong>Receive</strong> — Accept a document transferred to your office<br>
+        <strong>Release / Forward</strong> — Advance document to next workflow step<br>
+        <strong>Pull Out</strong> — Admin override to retrieve a document from any office<br>
+        <strong>Close</strong> — Admin override to close a document at any stage
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 </body>
 </html>

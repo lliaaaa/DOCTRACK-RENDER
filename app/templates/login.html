@@ -68,16 +68,46 @@ body {
         {% endwith %}
 
         <form method="POST" action="{{ url_for('auth.login') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="form-group">
                 <label>Email Address</label>
-                <input type="email" name="email" required placeholder="Enter your email">
+                <input type="email" name="email" id="loginEmail" required placeholder="Enter your email"
+                       oninput="this.classList.remove('input-invalid')">
+                <div id="emailError" class="field-err"></div>
             </div>
             <div class="form-group">
                 <label>Password</label>
-                <input type="password" name="password" required placeholder="Enter your password">
+                <input type="password" name="password" id="loginPassword" required placeholder="Enter your password"
+                       oninput="this.classList.remove('input-invalid')">
+                <div id="passwordError" class="field-err"></div>
             </div>
-            <button type="submit" class="login-btn">Sign In</button>
+            <button type="submit" class="login-btn" onclick="return validateLogin()">Sign In</button>
         </form>
+<style>
+.field-err { color:#b71c1c; font-size:11px; margin-top:3px; min-height:14px; }
+.input-invalid { border-color:#b71c1c !important; box-shadow:0 0 0 3px rgba(139,0,0,.12) !important; }
+</style>
+<script>
+function validateLogin() {
+  let valid = true;
+  const email = document.getElementById('loginEmail');
+  const pass  = document.getElementById('loginPassword');
+  document.getElementById('emailError').textContent    = '';
+  document.getElementById('passwordError').textContent = '';
+  if (!email.value.trim()) {
+    document.getElementById('emailError').textContent = 'Email is required.';
+    email.classList.add('input-invalid'); valid = false;
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
+    document.getElementById('emailError').textContent = 'Enter a valid email address.';
+    email.classList.add('input-invalid'); valid = false;
+  }
+  if (!pass.value) {
+    document.getElementById('passwordError').textContent = 'Password is required.';
+    pass.classList.add('input-invalid'); valid = false;
+  }
+  return valid;
+}
+</script>
     </div>
 
     <div class="login-footer">

@@ -47,6 +47,7 @@
 
     {% for dt in doc_types %}
     <form method="POST" style="margin-bottom:10px;">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="save_type_sla">
       <input type="hidden" name="doc_type_id" value="{{ dt.id }}">
       <div style="background:#FAFAF8;border:1px solid #EDE8E0;border-radius:6px;padding:12px 14px;">
@@ -99,6 +100,7 @@
     </div>
 
     <form method="POST" style="margin-bottom:16px;">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="save_charter">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end;">
         <div>
@@ -162,6 +164,7 @@
             <td style="padding:9px 12px;color:#5C5248;">{{ cfg.responsible_person or '—' }}</td>
             <td style="padding:9px 12px;">
               <form method="POST" style="display:inline;">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="action" value="delete_charter">
                 <input type="hidden" name="config_id" value="{{ cfg.id }}">
                 <button type="submit" class="btn-sm-action ba-delete" style="font-size:11px;padding:3px 8px;" onclick="return confirm('Remove this config?')">

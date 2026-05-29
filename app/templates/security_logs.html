@@ -1,0 +1,109 @@
+{% extends 'index.html' %}
+{% block content %}
+<style>
+.badge-action { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.badge-LOGIN          { background:#D1EDD8; color:#1A5C2E; }
+.badge-LOGOUT         { background:#E8E4DF; color:#5C5248; }
+.badge-LOGIN_FAILED   { background:#FDE8E8; color:#8B0000; }
+.badge-CREATE_DOC     { background:#DBEAFE; color:#1A3A6B; }
+.badge-RECEIVE_DOC    { background:#D1EDD8; color:#0f5132; }
+.badge-TRANSFER_DOC   { background:#FEF3C2; color:#7A5700; }
+.badge-CLOSE_DOC      { background:#E8E4DF; color:#5C5248; }
+.badge-DELETE_DOC     { background:#FDE8E8; color:#8B0000; }
+.badge-PULLOUT_DOC    { background:#F3E8FF; color:#5B21B6; }
+.badge-ASSIGN_DOC     { background:#E8DFFE; color:#4B1FA8; }
+.badge-UPDATE_SETTING { background:#DBEAFE; color:#1A3A6B; }
+.badge-CREATE_USER    { background:#D1FAE5; color:#065F46; }
+.badge-TOGGLE_USER    { background:#FEF3C2; color:#7A5700; }
+.badge-DELETE_USER    { background:#FDE8E8; color:#8B0000; }
+.badge-default        { background:#F0EDE8; color:#5C5248; }
+</style>
+
+<div class="content">
+  <div style="margin-bottom:20px;border-bottom:1px solid #EDE8E0;padding-bottom:12px;">
+    <h1 class="dashboard-title">Security Audit Log</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">
+      <i class="fa fa-shield-halved me-1"></i>
+      Authentication events &amp; document lifecycle actions — Admin only
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="gov-card" style="padding:14px 18px;margin-bottom:16px;">
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
+      <select name="action" class="form-select" style="max-width:200px;font-size:13px;" onchange="this.form.submit()">
+        <option value="">All Actions</option>
+        {% for a in distinct_actions %}
+        <option value="{{ a }}" {% if action_filter==a %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="q" value="{{ q_text }}" placeholder="Search user, doc code, details…"
+             class="form-control" style="max-width:280px;font-size:13px;">
+      <button type="submit" class="btn-gov"><i class="fa fa-search me-1"></i>Search</button>
+      {% if action_filter or q_text %}
+      <a href="{{ url_for('main.security_audit_logs') }}" class="btn-gov-outline">
+        <i class="fa fa-xmark me-1"></i>Clear
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="gov-card" style="padding:0;">
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>User</th>
+            <th>Document</th>
+            <th>IP Address</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td style="font-size:11px;color:var(--muted);white-space:nowrap;">
+              {{ log.timestamp.strftime('%b %d, %Y  %H:%M:%S') }}
+            </td>
+            <td>
+              <span class="badge-action badge-{{ log.action if log.action in [
+                'LOGIN','LOGOUT','LOGIN_FAILED','CREATE_DOC','RECEIVE_DOC','TRANSFER_DOC',
+                'CLOSE_DOC','DELETE_DOC','PULLOUT_DOC','ASSIGN_DOC','UPDATE_SETTING',
+                'CREATE_USER','TOGGLE_USER','DELETE_USER'] else 'default' }}">
+                {{ log.action.replace('_', ' ') }}
+              </span>
+            </td>
+            <td style="font-size:12px;">
+              <div style="font-weight:600;">{{ log.full_name or log.username }}</div>
+              <div style="color:var(--muted);font-size:10px;">{{ log.username }}</div>
+            </td>
+            <td style="font-size:12px;">
+              {% if log.document_code %}
+              <span class="doc-id">{{ log.document_code }}</span>
+              {% else %}-{% endif %}
+            </td>
+            <td style="font-size:11px;color:var(--muted);">{{ log.ip_address or '-' }}</td>
+            <td style="font-size:11px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+                title="{{ log.details or '' }}">
+              {{ log.details or '-' }}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" style="text-align:center;color:var(--muted);padding:40px;font-size:13px;">
+              <i class="fa fa-shield fa-lg mb-2 d-block"></i>No audit log entries found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:10px 14px;font-size:11px;color:var(--muted);border-top:1px solid #F0EDE8;">
+      Showing {{ logs|length }} entr{{ 'ies' if logs|length != 1 else 'y' }}
+      {% if logs|length == 500 %} (limited to 500 — use filters to narrow){% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

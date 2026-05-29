@@ -69,10 +69,12 @@
               onclick="openEditModal(this)">Edit</button>
               {% if not u.is_temp_admin %}
               <form method="POST" action="{{ url_for('main.toggle_user', id=u.id) }}" style="display:inline">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn-deactivate" type="submit">{{ 'Activate' if u.is_deactivated else 'Deactivate' }}</button>
               </form>
               <form method="POST" action="{{ url_for('main.delete_user', id=u.id) }}" style="display:inline"
                     onsubmit="return confirm('Delete {{ u.full_name }}?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button class="btn-delete-s" type="submit">Delete</button>
               </form>
               {% endif %}
@@ -97,6 +99,7 @@
             style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#999;">✕</button>
     <h5 class="mb-3"><i class="fa fa-user-plus me-2 text-danger"></i>Add Staff Member</h5>
     <form method="POST" action="{{ url_for('main.add_user') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-2">
         <label class="form-label fw-semibold">Full Name</label>
         <input type="text" name="full_name" class="form-control" required>
@@ -131,6 +134,7 @@
             style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#999;">✕</button>
     <h5 class="mb-3"><i class="fa fa-user-edit me-2 text-info"></i>Edit Staff Member</h5>
     <form id="editForm" method="POST">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="mb-2">
         <label class="form-label fw-semibold">Full Name</label>
         <input type="text" name="full_name" id="editFullName" class="form-control" required>

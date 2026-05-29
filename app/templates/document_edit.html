@@ -38,6 +38,7 @@
       </div>
 
       <form method="POST" action="{{ url_for('main.edit_document', record_id=record.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label">Document Title <span class="text-danger">*</span></label>

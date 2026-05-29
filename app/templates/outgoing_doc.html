@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Cancelling...';
       try {
         const res = await fetch(`/documents/cancel-transfer/${currentTransferId}`, {
-          method: 'POST', headers: {'Content-Type': 'application/json'}
+          method: 'POST', headers: {'Content-Type': 'application/json''X-CSRFToken': getCsrf(),}
         });
         const data = await res.json();
         if (data.success) {
@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', function() {
       this.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Sending...';
       try {
         const res = await fetch(`/documents/transfer/${currentRecordId}`, {
-          method: 'POST', headers: {'Content-Type': 'application/json'},
+          method: 'POST', headers: {'Content-Type': 'application/json''X-CSRFToken': getCsrf(),},
           body: JSON.stringify({ to_department: toDept, remarks })
         });
         const data = await res.json();

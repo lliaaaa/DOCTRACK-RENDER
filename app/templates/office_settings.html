@@ -98,6 +98,7 @@
           <span>{{ dt.name }}</span>
           <form method="POST" action="{{ url_for('main.office_settings') }}" style="display:inline"
                 onsubmit="return confirm('Delete this document type?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="delete_doc_type">
             <input type="hidden" name="id" value="{{ dt.id }}">
             <button type="submit" class="btn-del" title="Delete">✕</button>
@@ -117,6 +118,7 @@
           <span>{{ ds.name }}</span>
           <form method="POST" action="{{ url_for('main.office_settings') }}" style="display:inline"
                 onsubmit="return confirm('Delete this status?')">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="delete_status">
             <input type="hidden" name="id" value="{{ ds.id }}">
             <button type="submit" class="btn-del" title="Delete">✕</button>
@@ -127,6 +129,7 @@
         {% endfor %}
       </ul>
       <form method="POST" action="{{ url_for('main.office_settings') }}" class="add-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="action" value="add_status">
         <input type="text" name="name" placeholder="New status..." required>
         <button type="submit"><i class="fa fa-plus me-1"></i>Add</button>
@@ -181,7 +184,7 @@ function removeStep(i){
 
 function saveWorkflow(){
   if(!steps.length){alert('Cannot save empty workflow.');return;}
-  fetch('/api/svp-workflow/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(steps)})
+  fetch('/api/svp-workflow/save',{method:'POST',headers:{'Content-Type':'application/json''X-CSRFToken': getCsrf(),},body:JSON.stringify(steps)})
     .then(r=>r.json()).then(()=>{
       const m=document.getElementById('wfMsg');
       m.style.display='block';m.textContent='✓ Workflow saved successfully!';

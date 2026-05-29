@@ -121,7 +121,7 @@ function submitAssign() {
   const btn = document.getElementById('aSubmitBtn');
   btn.disabled = true; btn.textContent = 'Assigning...';
   fetch(`/documents/assign/${_aRecordId}`, {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json''X-CSRFToken': getCsrf(),},
     body: JSON.stringify({assigned_to: to, remarks: document.getElementById('aRemarks').value})
   }).then(r=>r.json()).then(()=>{ _aModal.hide(); location.reload(); })
     .catch(()=>{ btn.disabled=false; btn.innerHTML='<i class="fa fa-check me-1"></i>Assign'; alert('Error, try again.'); });

@@ -152,7 +152,7 @@ document.getElementById('confirmAssignBtn').addEventListener('click', async func
   try {
     const res = await fetch(`/documents/assign/${currentRecordId}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' 'X-CSRFToken': getCsrf(),},
       body: JSON.stringify({ assigned_to: assignedTo, remarks })
     });
     const data = await res.json();
