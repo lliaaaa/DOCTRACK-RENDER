@@ -125,5 +125,4 @@ def downgrade():
     sa.Column('updated_at', postgresql.TIMESTAMP(), autoincrement=False, nullable=False),
     sa.PrimaryKeyConstraint('id', name=op.f('record_pkey')),
     sa.UniqueConstraint('control', name=op.f('record_control_key'), postgresql_include=[], postgresql_nulls_not_distinct=False)
-                   )
-    
+    )

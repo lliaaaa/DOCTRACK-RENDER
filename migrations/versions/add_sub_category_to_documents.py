@@ -14,10 +14,18 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('documents', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('sub_category', sa.String(length=100), nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'documents' in inspector.get_table_names():
+        existing_cols = [c['name'] for c in inspector.get_columns('documents')]
+        if 'sub_category' not in existing_cols:
+            with op.batch_alter_table('documents', schema=None) as batch_op:
+                batch_op.add_column(sa.Column('sub_category', sa.String(length=100), nullable=True))
 
 
 def downgrade():
-    with op.batch_alter_table('documents', schema=None) as batch_op:
-        batch_op.drop_column('sub_category')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if 'documents' in inspector.get_table_names():
+        with op.batch_alter_table('documents', schema=None) as batch_op:
+            batch_op.drop_column('sub_category')

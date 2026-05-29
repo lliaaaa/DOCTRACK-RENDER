@@ -14,27 +14,48 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table('documents') as b:
-        b.add_column(sa.Column('workflow_step', sa.String(100), nullable=True))
-        b.add_column(sa.Column('arrived_at',   sa.DateTime,    nullable=True))
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
 
-    with op.batch_alter_table('document_type') as b:
-        b.add_column(sa.Column('transaction_category', sa.String(30),
-                               nullable=False, server_default='Simple'))
-        b.add_column(sa.Column('sla_minutes', sa.Integer,
-                               nullable=False, server_default='4320'))
+    if 'documents' in existing_tables:
+        existing_cols = [c['name'] for c in inspector.get_columns('documents')]
+        cols_to_add = []
+        if 'workflow_step' not in existing_cols:
+            cols_to_add.append(sa.Column('workflow_step', sa.String(100), nullable=True))
+        if 'arrived_at' not in existing_cols:
+            cols_to_add.append(sa.Column('arrived_at', sa.DateTime, nullable=True))
+        if cols_to_add:
+            with op.batch_alter_table('documents') as b:
+                for col in cols_to_add:
+                    b.add_column(col)
 
-    op.create_table(
-        'citizen_charter_config',
-        sa.Column('config_id',         sa.Integer, primary_key=True),
-        sa.Column('doc_type_id',       sa.Integer,
-                  sa.ForeignKey('document_type.document_type_id'), nullable=False),
-        sa.Column('department_id',     sa.Integer,
-                  sa.ForeignKey('departments.department_id'), nullable=True),
-        sa.Column('category',          sa.String(30),  nullable=False, server_default='Simple'),
-        sa.Column('sla_minutes',       sa.Integer,     nullable=False, server_default='4320'),
-        sa.Column('responsible_person', sa.String(150), nullable=True),
-    )
+    if 'document_type' in existing_tables:
+        existing_cols = [c['name'] for c in inspector.get_columns('document_type')]
+        cols_to_add = []
+        if 'transaction_category' not in existing_cols:
+            cols_to_add.append(sa.Column('transaction_category', sa.String(30),
+                                         nullable=False, server_default='Simple'))
+        if 'sla_minutes' not in existing_cols:
+            cols_to_add.append(sa.Column('sla_minutes', sa.Integer,
+                                         nullable=False, server_default='4320'))
+        if cols_to_add:
+            with op.batch_alter_table('document_type') as b:
+                for col in cols_to_add:
+                    b.add_column(col)
+
+    if 'citizen_charter_config' not in existing_tables:
+        op.create_table(
+            'citizen_charter_config',
+            sa.Column('config_id',          sa.Integer, primary_key=True),
+            sa.Column('doc_type_id',        sa.Integer,
+                      sa.ForeignKey('document_type.document_type_id'), nullable=False),
+            sa.Column('department_id',      sa.Integer,
+                      sa.ForeignKey('departments.department_id'), nullable=True),
+            sa.Column('category',           sa.String(30),  nullable=False, server_default='Simple'),
+            sa.Column('sla_minutes',        sa.Integer,     nullable=False, server_default='4320'),
+            sa.Column('responsible_person', sa.String(150), nullable=True),
+        )
 
 
 def downgrade():
