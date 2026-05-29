@@ -60,3 +60,89 @@ def api_documents():
             for r in records
         ],
     })
+
+
+# ── Server-Sent Events — real-time notification stream ────────────────────────
+# Replaces the 30-second JS polling interval.
+# The client connects once; the server pushes updates every 10 seconds.
+# Falls back automatically to polling if SSE is unsupported or the connection drops.
+
+import time
+import json as _json
+from flask import Response, stream_with_context
+
+
+@api_bp.route("/notifications/stream")
+@login_required
+def notifications_stream():
+    """
+    SSE endpoint that streams notification data to the client.
+
+    Emits JSON-encoded data every 10 seconds in the text/event-stream format.
+    The client (index.html) parses each message and calls applyNotificationData().
+
+    ISO/IEC 25010 Performance Efficiency: eliminates redundant HTTP polling,
+    replacing ~6 requests/min per user with a single persistent connection.
+    """
+    def _event_generator():
+        # Import inside generator so it runs inside the app context
+        from .routes_api import _build_notification_payload
+        retries = 0
+        while retries < 60:   # max ~10 minutes per connection; client reconnects
+            try:
+                payload = _build_notification_payload(current_user)
+                yield f"data: {_json.dumps(payload)}\n\n"
+            except Exception as exc:
+                yield f"data: {{}}\n\n"   # send empty payload on error, don't drop connection
+            time.sleep(10)
+            retries += 1
+
+    return Response(
+        stream_with_context(_event_generator()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",   # disable Nginx buffering for SSE
+        }
+    )
+
+
+def _build_notification_payload(user):
+    """
+    Build the notification payload dict for the given user.
+    Shared between the REST endpoint (/api/notifications) and the SSE stream.
+    """
+    from .models import Document, Transaction
+    from .routes  import visible_documents, COMPLETED_STATUSES
+
+    dept = user.department
+    records = visible_documents(dept).all()
+
+    pending_incoming = Transaction.query.filter_by(
+        destination=dept, is_received=False
+    ).count() if hasattr(Transaction, 'is_received') else (
+        Transaction.query.filter_by(destination=dept, transaction_type="transfer")
+        .join(Document, Transaction.document_id == Document.document_id)
+        .filter(Document.received_by == "")
+        .count()
+    )
+
+    alerts = []
+    for r in records:
+        if r.status in COMPLETED_STATUSES:
+            continue
+        info = r.sla_info()
+        if info.get("tier") in ("yellow", "red"):
+            alerts.append({
+                "id":              r.document_id,
+                "code":            r.document_code,
+                "title":           r.title,
+                "tier":            info["tier"],
+                "tier_label":      info["tier_label"],
+                "pct":             info["pct"],
+                "elapsed_minutes": info["elapsed_minutes"],
+                "hours_left":      info["hours_left"],
+            })
+
+    alerts.sort(key=lambda x: x["pct"], reverse=True)
+    return {"pending_incoming": pending_incoming, "alerts": alerts[:10]}

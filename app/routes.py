@@ -8,11 +8,11 @@ from flask_login import login_required, current_user
 from sqlalchemy import func, or_
 from sqlalchemy.orm import aliased
 
-from . import db
+from . import db, cache
 from .models import (Document, Department, Transaction, User, Account,
                      DocumentType, DocumentStatus, CitizenCharterConfig,
                      DEFAULT_SLA, TRANSACTION_CATEGORIES, generate_document_code,
-                     SVPWorkflowStep)
+                     SVPWorkflowStep, AuditLog, log_audit, AuditAction)
 from .decorators import role_required
 
 bp = Blueprint("main", __name__)
@@ -134,7 +134,13 @@ def home():
 
 @bp.route("/dashboard")
 @login_required
+@cache.cached(timeout=30, key_prefix=lambda: f"dashboard_{current_user.id}")
 def dashboard():
+    """
+    Main dashboard: shows document stats, SLA summary, and charts
+    for documents currently in the user's department.
+    Cached per-user for 30 seconds (ISO/IEC 25010 Performance).
+    """
     records_q = visible_documents(current_user.department)
     all_recs  = records_q.order_by(Document.datetime.desc()).all()
 
@@ -213,6 +219,10 @@ def notifications():
 @bp.route("/documents")
 @login_required
 def documents():
+    """
+    Document list view with search, status filter, and SLA color coding.
+    Filters by department visibility rules (admin sees all, staff sees own dept).
+    """
     q = request.args.get("q", "").strip()
     status_filter = request.args.get("status", "").strip()
     dept_id = get_dept_id(current_user.department)
@@ -265,6 +275,10 @@ def documents():
 @bp.route("/documents/<int:record_id>")
 @login_required
 def document_detail(record_id):
+    """
+    Detailed view of a single document: shows full transaction history,
+    SLA progress bar, available workflow actions, and pull-out option (admin).
+    """
     record = visible_documents(current_user.department).filter(
         Document.document_id == record_id).first()
     if not record: abort(404)
@@ -282,6 +296,11 @@ def document_detail(record_id):
 @login_required
 @role_required("admin")
 def edit_document(record_id):
+    """
+    GET:  Pre-populate the edit form with the document's current data.
+    POST: Update editable fields (title, priority, amount, remarks).
+    Only admin or document creator may edit.
+    """
     record = db.session.get(Document, record_id) or abort(404)
     if request.method == "POST":
         record.title = request.form.get("title", record.title)
@@ -321,9 +340,17 @@ def edit_document(record_id):
 @login_required
 @role_required("admin")
 def delete_document(record_id):
+    """
+    POST: Permanently delete a document and all its transactions.
+    Admin-only. Action is recorded in AuditLog.
+    """
     record = db.session.get(Document, record_id) or abort(404)
+    doc_code = record.document_code
+    doc_title = record.title[:80]
     db.session.delete(record)
     db.session.commit()
+    log_audit(AuditAction.DELETE_DOC, document_code=doc_code,
+              details=f"Deleted: '{doc_title}'")
     flash("Document deleted.", "info")
     return redirect(url_for("main.documents"))
 
@@ -350,6 +377,8 @@ def close_document(record_id):
         handled_by_user_id=current_user.user.user_id, status="Closed",
         remarks=f"[Closed at stage: {prev_status}] {remarks}"))
     db.session.commit()
+    log_audit(AuditAction.CLOSE_DOC, document_code=record.document_code,
+              details=f"Closed at stage '{prev_status}' — {remarks}")
     return jsonify(success=True, message="Document has been closed.")
 
 
@@ -454,6 +483,11 @@ def delete_user(id):
 @bp.route("/add_document", methods=["GET", "POST"])
 @login_required
 def add_document():
+    """
+    GET:  Render the new document form.
+    POST: Validate and create a new document record, auto-assign workflow
+          status based on document type, and record an AuditLog entry.
+    """
     dept_accounts   = get_dept_users(current_user.department)
     document_type   = DocumentType.query.all()
     document_status = DocumentStatus.query.all()
@@ -492,6 +526,8 @@ def add_document():
             action_by_name=current_user.full_name,
             handled_by_user_id=current_user.user.user_id, status=auto_status))
         db.session.commit()
+        log_audit(AuditAction.CREATE_DOC, document_code=record.document_code,
+                  details=f"Created '{record.title[:80]}' | Type: {type_name} | Dept: {current_user.department}")
         flash(f"Document {record.document_code} added successfully.", "success")
         return redirect(url_for("main.document_detail", record_id=record.document_id))
     return render_template("admin/new_doc.html", users=dept_accounts,
@@ -704,6 +740,12 @@ def assigned_documents():
 @bp.route("/documents/transfer/<int:record_id>", methods=["POST"])
 @login_required
 def transfer_document(record_id):
+    """
+    POST (AJAX): Advance a document to the next workflow step.
+    SVP documents follow the predefined sequence; other types use
+    dynamic routing based on implementing_office.
+    Returns JSON { success, message, record_id, status }.
+    """
     record = db.session.get(Document, record_id) or abort(404)
     if record.status in COMPLETED_STATUSES:
         return jsonify(success=False, message="This document is already completed.")
@@ -746,6 +788,8 @@ def transfer_document(record_id):
             handled_by_user_id=current_user.user.user_id,
             status=next_status, remarks=remarks))
         db.session.commit()
+        log_audit(AuditAction.TRANSFER_DOC, document_code=record.document_code,
+                  details=f"SVP auto-advance to '{next_status}' → {to_dept}")
         return jsonify(success=True,
                        message=f"Document advanced to '{next_status}' → sent to {to_dept}.",
                        record_id=record.document_id, status=next_status)
@@ -782,6 +826,8 @@ def transfer_document(record_id):
         handled_by_user_id=current_user.user.user_id,
         status=new_status, remarks=remarks))
     db.session.commit()
+    log_audit(AuditAction.TRANSFER_DOC, document_code=record.document_code,
+              details=f"Transferred from {current_user.department} → {to_dept} | Status: {new_status}")
     return jsonify(success=True, message=f"Document released to {to_dept}.",
                    record_id=record.document_id, status=new_status)
 
@@ -804,6 +850,12 @@ def cancel_transfer(transfer_history_id):
 @bp.route("/documents/receive/<int:record_id>", methods=["POST"])
 @login_required
 def receive_document(record_id):
+    """
+    POST (AJAX): Mark a transferred document as received by the current user.
+    Sets received_by and arrived_at; does NOT overwrite workflow status
+    (fixes the SVP bug where status was overwritten with "Assigned").
+    Returns JSON { success, message }.
+    """
     record = db.session.get(Document, record_id) or abort(404)
     dept   = current_user.department
 
@@ -833,6 +885,8 @@ def receive_document(record_id):
         action_by_name=current_user.full_name,
         handled_by_user_id=current_user.user.user_id, status=tx_status))
     db.session.commit()
+    log_audit(AuditAction.RECEIVE_DOC, document_code=record.document_code,
+              details=f"Received at {dept} | Status: {tx_status}")
     return jsonify(success=True, message="Document received and assigned to you.",
                    record_id=record.document_id, new_department=dept,
                    status=tx_status, received_by=current_user.full_name)
@@ -898,6 +952,12 @@ def assign_document(record_id):
 @login_required
 @role_required("admin")
 def pullout_document(record_id):
+    """
+    POST (AJAX): Admin override — pull a document out of any office
+    and redirect it to a specified destination department.
+    Action is recorded in AuditLog with reason/remarks.
+    Returns JSON { success, message }.
+    """
     record  = db.session.get(Document, record_id) or abort(404)
     data    = request.get_json() or {}
     to_dept = data.get("to_department", current_user.department).strip()
@@ -918,6 +978,8 @@ def pullout_document(record_id):
         handled_by_user_id=current_user.user.user_id, status="Pulled Out",
         remarks=f"Pulled out by {current_user.full_name}" + (f" — {remarks}" if remarks else "")))
     db.session.commit()
+    log_audit(AuditAction.PULLOUT_DOC, document_code=record.document_code,
+              details=f"Pulled out from {prev_dept} to {to_dept}" + (f" — {remarks}" if remarks else ""))
     return jsonify(success=True, message=f"Document pulled out to {to_dept}.",
                    record_id=record.document_id)
 
@@ -1221,6 +1283,10 @@ def export_reports():
 @login_required
 @role_required("admin")
 def activity_logs():
+    """
+    Document transaction log: shows the full routing history across all
+    departments, filterable by date range and document code.
+    """
     dept = current_user.department
     action_filter = request.args.get("action", "").strip()
     records_q = (Transaction.query
@@ -1235,6 +1301,42 @@ def activity_logs():
 
 # ---------------------------------------------------------------------------
 # Error handlers
+# ---------------------------------------------------------------------------
+# Security Audit Log  (ISO/IEC 25010 – Security / Accountability)
+# ---------------------------------------------------------------------------
+
+@bp.route("/security_logs")
+@login_required
+@role_required("admin")
+def security_audit_logs():
+    """
+    Admin-only view of the AuditLog table.
+    Shows authentication events (LOGIN, LOGOUT, LOGIN_FAILED) and all
+    document lifecycle actions recorded by log_audit().
+    """
+    action_filter = request.args.get("action", "").strip()
+    q_text        = request.args.get("q", "").strip()
+
+    query = AuditLog.query.order_by(AuditLog.timestamp.desc())
+    if action_filter:
+        query = query.filter(AuditLog.action == action_filter)
+    if q_text:
+        query = query.filter(
+            AuditLog.username.ilike(f"%{q_text}%") |
+            AuditLog.document_code.ilike(f"%{q_text}%") |
+            AuditLog.details.ilike(f"%{q_text}%")
+        )
+
+    logs = query.limit(500).all()
+    distinct_actions = [r[0] for r in
+                        AuditLog.query.with_entities(AuditLog.action).distinct().all()]
+    return render_template("security_logs.html",
+                           logs=logs,
+                           action_filter=action_filter,
+                           q_text=q_text,
+                           distinct_actions=sorted(distinct_actions))
+
+
 # ---------------------------------------------------------------------------
 
 @bp.errorhandler(403)

@@ -129,7 +129,15 @@ class DocumentStatus(db.Model):
 
 
 def generate_document_code():
-    """DOC{MM}{DD}{YYYY}{HH}{mm}{ss}{NNN} — seq 001-999 wraps."""
+    """
+    Generate a unique document code in the format: DOC{MMDDYYYY}{HHmmss}{NNN}
+
+    NNN is a zero-padded sequence number (001-999) derived from the last
+    document's ID to handle multiple documents created within the same second.
+
+    Example: DOC052720261435001
+    Satisfies RA 11032 document tracking traceability requirements.
+    """
     now = datetime.now()
     ts  = now.strftime("%m%d%Y%H%M%S")
     last_doc = Document.query.order_by(Document.document_id.desc()).first()
@@ -187,7 +195,20 @@ class Document(db.Model):
     def history(self):     return self.transactions
 
     def sla_info(self):
-        """Return dict: {sla_minutes, elapsed_minutes, pct, tier, tier_label, hours_left}"""
+        """
+        Compute SLA compliance status per RA 11032 (Citizen's Charter).
+
+        Returns a dict with:
+            sla_minutes     : total allowed processing time in minutes
+            elapsed_minutes : time since document arrived at current office
+            pct             : % of SLA consumed (can exceed 100 if overdue)
+            tier            : 'blue' (< 25%) | 'green' (25-50%) |
+                              'yellow' (50-75%) | 'red' (> 75%)
+            tier_label      : human-readable label (e.g. 'On Track')
+            hours_left      : remaining hours before SLA breach (negative = overdue)
+
+        Color coding mirrors the dashboard SLA indicators and help modal legend.
+        """
         sla = DEFAULT_SLA.get("Simple")
         if self.doc_type_rel:
             sla = self.doc_type_rel.sla_minutes or sla
@@ -259,3 +280,92 @@ class SVPWorkflowStep(db.Model):
         return {'id': self.id, 'step_order': self.step_order,
                 'status_name': self.status_name,
                 'department_name': self.department_name or ''}
+
+
+# ===========================================================================
+# AuditLog — Security & compliance audit trail (ISO/IEC 25010 Security)
+# ===========================================================================
+
+class AuditLog(db.Model):
+    """
+    Records every significant security and workflow event in DocTrack.
+    Required for government system compliance and ISO/IEC 25010 Security.
+    Separate from Transaction (which tracks document routing) — this table
+    tracks WHO did WHAT and from WHERE, including auth events.
+    """
+    __tablename__ = 'audit_log'
+
+    id            = db.Column(db.Integer, primary_key=True)
+    account_id    = db.Column(db.Integer, db.ForeignKey('accounts.account_id'), nullable=True)
+    # Denormalized: persists even if account is deleted
+    username      = db.Column(db.String(255), nullable=False, default='anonymous')
+    full_name     = db.Column(db.String(150), nullable=True)
+    action        = db.Column(db.String(50),  nullable=False)   # see ACTION_* constants below
+    document_code = db.Column(db.String(50),  nullable=True)
+    details       = db.Column(db.Text,        nullable=True)
+    ip_address    = db.Column(db.String(50),  nullable=True)
+    timestamp     = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    def __repr__(self):
+        return f'<AuditLog [{self.action}] by {self.username} @ {self.timestamp}>'
+
+    def to_dict(self):
+        return dict(id=self.id, username=self.username, full_name=self.full_name,
+                    action=self.action, document_code=self.document_code,
+                    details=self.details, ip_address=self.ip_address,
+                    timestamp=self.timestamp.strftime('%Y-%m-%d %H:%M:%S'))
+
+
+# Action constants — use these instead of raw strings
+class AuditAction:
+    LOGIN          = 'LOGIN'
+    LOGIN_FAILED   = 'LOGIN_FAILED'
+    LOGOUT         = 'LOGOUT'
+    CREATE_DOC     = 'CREATE_DOC'
+    RECEIVE_DOC    = 'RECEIVE_DOC'
+    TRANSFER_DOC   = 'TRANSFER_DOC'
+    CLOSE_DOC      = 'CLOSE_DOC'
+    DELETE_DOC     = 'DELETE_DOC'
+    PULLOUT_DOC    = 'PULLOUT_DOC'
+    ASSIGN_DOC     = 'ASSIGN_DOC'
+    EDIT_DOC       = 'EDIT_DOC'
+    CREATE_USER    = 'CREATE_USER'
+    TOGGLE_USER    = 'TOGGLE_USER'
+    DELETE_USER    = 'DELETE_USER'
+    UPDATE_SETTING = 'UPDATE_SETTING'
+
+
+def log_audit(action: str, document_code: str = None, details: str = None):
+    """
+    Write one AuditLog entry for the currently authenticated user.
+    Safe to call inside a route — uses its own commit and never crashes
+    the parent request even if it fails.
+
+    Usage:
+        from .models import log_audit, AuditAction
+        log_audit(AuditAction.CREATE_DOC, document_code=doc.document_code,
+                  details=f"Created by {current_user.full_name}")
+    """
+    try:
+        from flask import request as _req
+        from flask_login import current_user as _cu
+        account_id = _cu.id       if _cu.is_authenticated else None
+        username   = _cu.username if _cu.is_authenticated else 'anonymous'
+        full_name  = _cu.full_name if _cu.is_authenticated else None
+        ip         = _req.remote_addr if _req else None
+
+        entry = AuditLog(
+            account_id=account_id,
+            username=username,
+            full_name=full_name,
+            action=action,
+            document_code=document_code,
+            details=details,
+            ip_address=ip,
+        )
+        db.session.add(entry)
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        import logging
+        logging.getLogger('doctrack').error(f"AuditLog write failed: {exc}")
