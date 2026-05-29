@@ -14,6 +14,8 @@ def login():
     Authenticate a user by email and password.
     Rate-limited to 10 POST attempts per minute per IP.
     All login attempts (success and failure) are recorded in AuditLog.
+    After login, users with must_change_password=True are redirected to the
+    forced password-change page before accessing any other route.
     """
     if request.method == "POST":
         email    = request.form["email"].lower().strip()
@@ -43,9 +45,49 @@ def login():
         login_user(account)
         log_audit(AuditAction.LOGIN,
                   details=f"Logged in from {request.remote_addr}")
+
+        # Fix #6 — redirect to forced password change immediately after login
+        if account.must_change_password:
+            flash("Your password was set by an admin. Please change it now.", "warning")
+            return redirect(url_for("auth.force_change_password"))
+
         return redirect(url_for("main.dashboard"))
 
     return render_template("login.html")
+
+
+@bp.route("/force-change-password", methods=["GET", "POST"])
+@login_required
+def force_change_password():
+    """
+    Fix #6 — Forced password change for accounts created with a temporary
+    admin-set password (must_change_password=True).
+    The user cannot navigate away until they complete this.
+    """
+    # Already changed — nothing to do
+    if not current_user.must_change_password:
+        return redirect(url_for("main.dashboard"))
+
+    if request.method == "POST":
+        new_password     = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+
+        if len(new_password) < 6:
+            flash("Password must be at least 6 characters.", "warning")
+            return redirect(url_for("auth.force_change_password"))
+
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "warning")
+            return redirect(url_for("auth.force_change_password"))
+
+        current_user.set_password(new_password)
+        current_user.must_change_password = False
+        db.session.commit()
+        log_audit(AuditAction.UPDATE_SETTING, details="Forced password change completed")
+        flash("Password updated successfully. Welcome!", "success")
+        return redirect(url_for("main.dashboard"))
+
+    return render_template("auth/force_change_password.html")
 
 
 @bp.route("/change-password", methods=["POST"])

@@ -62,8 +62,18 @@ def init_scheduler(app):
         misfire_grace_time=3600,
     )
 
+    # ── Job 3: Hourly expired temp-admin revocation ──────────────────────
+    _scheduler.add_job(
+        func=lambda: _revoke_expired_temp_admins(app),
+        trigger=CronTrigger(minute=0),   # every hour on the hour
+        id="revoke_expired_temp_admins",
+        name="Revoke Expired Temp Admins",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
     _scheduler.start()
-    logger.info("DocTrack scheduler started. Jobs: daily_backup, cleanup_audit_logs")
+    logger.info("DocTrack scheduler started. Jobs: daily_backup, cleanup_audit_logs, revoke_expired_temp_admins")
 
 
 def _run_backup(app):
@@ -138,3 +148,28 @@ def _cleanup_old_audit_logs(app):
         except Exception as e:
             db.session.rollback()
             logger.error(f"AuditLog cleanup failed: {e}")
+
+
+def _revoke_expired_temp_admins(app):
+    """
+    Fix #5 — Auto-revoke temp-admin grants whose expiry timestamp has passed.
+    Runs every hour. Logs each revocation so it appears in the audit trail.
+    """
+    with app.app_context():
+        from .models import Account, db, log_audit, AuditAction
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        expired = Account.query.filter(
+            Account.is_temp_admin == True,
+            Account.temp_admin_expires_at != None,
+            Account.temp_admin_expires_at <= now,
+        ).all()
+        for account in expired:
+            account.revoke_temp_admin()
+            logger.info(f"Temp admin revoked for account_id={account.account_id} ({account.username})")
+        if expired:
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Temp admin revocation commit failed: {e}")

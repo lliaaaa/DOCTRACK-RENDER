@@ -57,7 +57,9 @@ class Account(db.Model, UserMixin):
     password      = db.Column(db.String(255), nullable=False)
     role          = db.Column(db.String(50),  default='user', nullable=False)
     status        = db.Column(db.String(20),  default='active', nullable=False)
-    is_temp_admin = db.Column(db.Boolean, default=False)
+    is_temp_admin         = db.Column(db.Boolean,  default=False)
+    temp_admin_expires_at = db.Column(db.DateTime, nullable=True)   # UTC; None = no expiry
+    must_change_password  = db.Column(db.Boolean,  default=False)   # force pw reset on next login
     created_at    = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     user = db.relationship('User', back_populates='account')
     def get_id(self):               return str(self.account_id)
@@ -77,6 +79,22 @@ class Account(db.Model, UserMixin):
     def is_deactivated(self): return self.status == 'inactive'
     @is_deactivated.setter
     def is_deactivated(self, v): self.status = 'inactive' if v else 'active'
+
+    @property
+    def is_temp_admin_expired(self) -> bool:
+        """True when a temp-admin grant has passed its expiry timestamp."""
+        if not self.is_temp_admin or self.temp_admin_expires_at is None:
+            return False
+        expiry = (self.temp_admin_expires_at.replace(tzinfo=timezone.utc)
+                  if self.temp_admin_expires_at.tzinfo is None
+                  else self.temp_admin_expires_at)
+        return datetime.now(timezone.utc) >= expiry
+
+    def revoke_temp_admin(self):
+        """Downgrade an expired (or manually revoked) temp-admin back to 'user'."""
+        self.role = 'user'
+        self.is_temp_admin = False
+        self.temp_admin_expires_at = None
 
 
 class DepartmentAssignment(db.Model):

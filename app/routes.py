@@ -409,10 +409,11 @@ def add_user():
                     email=email, department_id=dept.department_id if dept else None)
     db.session.add(new_user); db.session.flush()
     account = Account(user_id=new_user.user_id, username=email,
-                      role=request.form.get("role","user"), status="active")
+                      role=request.form.get("role","user"), status="active",
+                      must_change_password=True)   # Fix #6: force pw reset on first login
     account.set_password(request.form["password"])
     db.session.add(account); db.session.commit()
-    flash("User added successfully.", "success")
+    flash("User added successfully. They will be prompted to change their password on first login.", "success")
     return redirect(url_for("main.users"))
 
 
@@ -443,7 +444,15 @@ def edit_user(id):
         account.set_password(new_password)
     give_admin = request.form.get("give_admin_access") == "on"
     account.role = "admin" if give_admin else "user"
-    account.is_temp_admin = give_admin
+    if give_admin:
+        from datetime import timedelta
+        hours = int(request.form.get("temp_admin_hours", 24) or 24)
+        hours = max(1, min(hours, 720))   # clamp: 1 hr – 30 days
+        account.is_temp_admin = True
+        # Fix #5: temp admin auto-expires after admin-chosen duration
+        account.temp_admin_expires_at = datetime.now(timezone.utc) + timedelta(hours=hours)
+    else:
+        account.revoke_temp_admin()   # Fix #5: immediate revoke when unchecked
     db.session.commit()
     flash(f"User {full_name} updated.", "success")
     return redirect(url_for("main.users"))

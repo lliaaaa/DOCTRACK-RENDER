@@ -165,7 +165,8 @@ def _seed_data():
             db.session.add(user)
             db.session.flush()
             account = Account(user_id=user.user_id, username=email,
-                              role="admin", status="active")
+                              role="admin", status="active",
+                              must_change_password=True)  # Fix #6: force pw change on first login
             account.set_password("123")
             db.session.add(account)
     db.session.flush()
