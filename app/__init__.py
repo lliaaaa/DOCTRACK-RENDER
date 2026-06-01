@@ -134,41 +134,80 @@ def _setup_logger(app):
     app.logger.setLevel(logging.INFO)
 
 
-# ── Seed data (unchanged from original) ─────────────────────────────────────
+# ── Seed data ────────────────────────────────────────────────────────────────
 
 def _seed_data():
     from datetime import datetime, timezone, timedelta
 
-    department_names = [
-        "ABC Office", "Accounting Office", "Agriculture Office",
-        "Assessors Office", "BAC Office", "Budget Office", "COMELEC Office",
-        "Engineering", "Human Resources Office", "Library Office",
-        "Office of the Mayor", "MENRO Office", "MDRRMO Office",
-        "MPDC Office", "Municipal Health Office", "Treasurer Office",
-        "Vice Mayor Office",
+    # Each entry: (display_name, short_code)
+    departments = [
+        ("Association of Barangay Captains (ABC) Office", "ABC"),
+        ("Accounting Office", "ACCTG"),
+        ("Assessor's Office", "ASSESS"),
+        ("Budget Office", "BUDGET"),
+        ("Bureau of Fire Protection (BFP)", "BFP"),
+        ("Commission on Elections (COMELEC) Office", "COMELEC"),
+        ("Department of the Interior and Local Government (DILG) Office", "DILG"),
+        ("Human Resource Management Office (HRMO)", "HRMO"),
+        ("Library Office", "LIB"),
+        ("Mayor's Office (MO)", "MO"),
+        ("Municipal Agriculture Office (MAO)", "MAO"),
+        ("Municipal Civil Registrar Office (MCRO)", "MCRO"),
+        ("Municipal Disaster Risk Reduction and Management Office (MDRRMO)", "MDRRMO"),
+        ("Municipal Engineering Office (MEO)", "MEO"),
+        ("Municipal Environment and Natural Resources Office (MENRO)", "MENRO"),
+        ("Municipal Health Office/Rural Health Unit (MHO/RHU)", "MHO"),
+        ("Municipal Planning and Development Office (MPDO)", "MPDO"),
+        ("Municipal Social Welfare and Development Office (MSWDO)", "MSWDO"),
+        ("Office for Senior Citizens Affairs (OSCA)", "OSCA"),
+        ("Philippine National Police (PNP)", "PNP"),
+        ("Public Employment Service Office (PESO)", "PESO"),
+        ("Sangguniang Bayan (SB) Office", "SBO"),
+        ("Tourism Office", "TOUR"),
+        ("Treasurer's Office", "TREAS"),
+        ("Vice Mayor's Office", "VMO"),
+        ("Pantawid Pamilyang Pilipino Program (4Ps) Office", "4PS"),
     ]
 
-    for name in department_names:
-        if not Department.query.filter_by(department_name=name).first():
-            code = "".join(w[0] for w in name.split())[:6].upper()
-            db.session.add(Department(department_name=name, department_code=code))
+    for dept_name, dept_code in departments:
+        if not Department.query.filter_by(department_name=dept_name).first():
+            db.session.add(Department(department_name=dept_name, department_code=dept_code))
     db.session.flush()
 
-    for dept_name in department_names:
+    DEFAULT_PASSWORD = "PASSWORD123"
+
+    for dept_name, dept_code in departments:
         dept = Department.query.filter_by(department_name=dept_name).first()
         if not dept:
             continue
-        email = f"{dept_name.lower().replace(' ', '').replace('/', '')}@site.com"
-        if not User.query.filter_by(email=email).first():
+        slug = dept_code.lower().replace("/", "").replace("(", "").replace(")", "")
+
+        # Admin account
+        admin_email = f"{slug}.admin@lgu-unisan.com"
+        if not User.query.filter_by(email=admin_email).first():
             user = User(first_name=dept_name, last_name="Admin",
-                        email=email, department_id=dept.department_id)
+                        email=admin_email, department_id=dept.department_id)
             db.session.add(user)
             db.session.flush()
-            account = Account(user_id=user.user_id, username=email,
+            account = Account(user_id=user.user_id, username=admin_email,
                               role="admin", status="active",
-                              must_change_password=True)  # Fix #6: force pw change on first login
-            account.set_password("123")
+                              must_change_password=True)
+            account.set_password(DEFAULT_PASSWORD)
             db.session.add(account)
+
+        # Staff account
+        staff_email = f"{slug}.staff@lgu-unisan.com"
+        if not User.query.filter_by(email=staff_email).first():
+            user = User(first_name=dept_name, last_name="Staff",
+                        email=staff_email, department_id=dept.department_id)
+            db.session.add(user)
+            db.session.flush()
+            account = Account(user_id=user.user_id, username=staff_email,
+                              role="staff", status="active",
+                              must_change_password=True)
+            account.set_password(DEFAULT_PASSWORD)
+            db.session.add(account)
+
     db.session.flush()
 
     for name in ["SVP", "Bidding"]:
