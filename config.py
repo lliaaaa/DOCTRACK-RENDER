@@ -1,4 +1,5 @@
 import os
+import secrets
 
 class Config:
     _db_url = os.environ.get('DATABASE_URL', '')
@@ -16,5 +17,9 @@ class Config:
         'pool_timeout':  20,
         'max_overflow':  5,
     }
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'change-this-in-render-env-vars')
+
+    # SECRET_KEY must be set in Render environment variables.
+    # Falls back to a random key (sessions won't persist across restarts).
+    SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+
     DEBUG = False
