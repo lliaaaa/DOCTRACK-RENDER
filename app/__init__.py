@@ -139,74 +139,74 @@ def _setup_logger(app):
 def _seed_data():
     from datetime import datetime, timezone, timedelta
 
-    # Each entry: (display_name, short_code)
-    departments = [
-        ("Association of Barangay Captains (ABC) Office", "ABC"),
-        ("Accounting Office", "ACCTG"),
-        ("Assessor's Office", "ASSESS"),
-        ("Budget Office", "BUDGET"),
-        ("Bureau of Fire Protection (BFP)", "BFP"),
-        ("Commission on Elections (COMELEC) Office", "COMELEC"),
-        ("Department of the Interior and Local Government (DILG) Office", "DILG"),
-        ("Human Resource Management Office (HRMO)", "HRMO"),
-        ("Library Office", "LIB"),
-        ("Mayor's Office (MO)", "MO"),
-        ("Municipal Agriculture Office (MAO)", "MAO"),
-        ("Municipal Civil Registrar Office (MCRO)", "MCRO"),
-        ("Municipal Disaster Risk Reduction and Management Office (MDRRMO)", "MDRRMO"),
-        ("Municipal Engineering Office (MEO)", "MEO"),
-        ("Municipal Environment and Natural Resources Office (MENRO)", "MENRO"),
-        ("Municipal Health Office/Rural Health Unit (MHO/RHU)", "MHO"),
-        ("Municipal Planning and Development Office (MPDO)", "MPDO"),
-        ("Municipal Social Welfare and Development Office (MSWDO)", "MSWDO"),
-        ("Office for Senior Citizens Affairs (OSCA)", "OSCA"),
-        ("Philippine National Police (PNP)", "PNP"),
-        ("Public Employment Service Office (PESO)", "PESO"),
-        ("Sangguniang Bayan (SB) Office", "SBO"),
-        ("Tourism Office", "TOUR"),
-        ("Treasurer's Office", "TREAS"),
-        ("Vice Mayor's Office", "VMO"),
-        ("Pantawid Pamilyang Pilipino Program (4Ps) Office", "4PS"),
+    # 26 LGU Unisan offices: (full display name, short username prefix)
+    OFFICES = [
+        ("Association of Barangay Captains (ABC) Office",                         "abc"),
+        ("Accounting Office",                                                      "acctg"),
+        ("Assessor's Office",                                                     "assess"),
+        ("Budget Office",                                                          "budget"),
+        ("Bureau of Fire Protection (BFP)",                                        "bfp"),
+        ("Commission on Elections (COMELEC) Office",                               "comelec"),
+        ("Department of the Interior and Local Government (DILG) Office",          "dilg"),
+        ("Human Resource Management Office (HRMO)",                                "hrmo"),
+        ("Library Office",                                                         "lib"),
+        ("Mayor's Office (MO)",                                                   "mo"),
+        ("Municipal Agriculture Office (MAO)",                                     "mao"),
+        ("Municipal Civil Registrar Office (MCRO)",                                "mcro"),
+        ("Municipal Disaster Risk Reduction and Management Office (MDRRMO)",       "mdrrmo"),
+        ("Municipal Engineering Office (MEO)",                                     "meo"),
+        ("Municipal Environment and Natural Resources Office (MENRO)",             "menro"),
+        ("Municipal Health Office/Rural Health Unit (MHO/RHU)",                   "mho"),
+        ("Municipal Planning and Development Office (MPDO)",                       "mpdo"),
+        ("Municipal Social Welfare and Development Office (MSWDO)",                "mswdo"),
+        ("Office for Senior Citizens Affairs (OSCA)",                              "osca"),
+        ("Philippine National Police (PNP)",                                       "pnp"),
+        ("Public Employment Service Office (PESO)",                                "peso"),
+        ("Sangguniang Bayan (SB) Office",                                          "sbo"),
+        ("Tourism Office",                                                         "tour"),
+        ("Treasurer's Office",                                                    "treas"),
+        ("Vice Mayor's Office",                                                   "vmo"),
+        ("Pantawid Pamilyang Pilipino Program (4Ps) Office",                       "4ps"),
+        ("Bids and Awards Committee (BAC) Office",                                 "bac"),
     ]
-
-    for dept_name, dept_code in departments:
-        if not Department.query.filter_by(department_name=dept_name).first():
-            db.session.add(Department(department_name=dept_name, department_code=dept_code))
-    db.session.flush()
 
     DEFAULT_PASSWORD = "PASSWORD123"
 
-    for dept_name, dept_code in departments:
+    # Seed departments
+    for dept_name, _ in OFFICES:
+        if not Department.query.filter_by(department_name=dept_name).first():
+            code = dept_name.split("(")[1].rstrip(")") if "(" in dept_name else dept_name[:6].upper()
+            db.session.add(Department(department_name=dept_name, department_code=code))
+    db.session.flush()
+
+    # Seed one admin + one staff per office
+    for dept_name, prefix in OFFICES:
         dept = Department.query.filter_by(department_name=dept_name).first()
         if not dept:
             continue
-        slug = dept_code.lower().replace("/", "").replace("(", "").replace(")", "")
 
-        # Admin account
-        admin_email = f"{slug}.admin@lgu-unisan.com"
-        if not User.query.filter_by(email=admin_email).first():
-            user = User(first_name=dept_name, last_name="Admin",
-                        email=admin_email, department_id=dept.department_id)
-            db.session.add(user)
-            db.session.flush()
-            account = Account(user_id=user.user_id, username=admin_email,
-                              role="admin", status="active",
-                              must_change_password=True)
-            account.set_password(DEFAULT_PASSWORD)
-            db.session.add(account)
+        for role, suffix, label in [("admin", "admin", "Admin"), ("staff", "staff", "Staff")]:
+            username = f"{prefix}.{suffix}"
+            email    = f"{prefix}.{suffix}@lgu-unisan.com"
 
-        # Staff account
-        staff_email = f"{slug}.staff@lgu-unisan.com"
-        if not User.query.filter_by(email=staff_email).first():
-            user = User(first_name=dept_name, last_name="Staff",
-                        email=staff_email, department_id=dept.department_id)
-            db.session.add(user)
-            db.session.flush()
-            account = Account(user_id=user.user_id, username=staff_email,
-                              role="staff", status="active",
-                              must_change_password=True)
-            account.set_password(DEFAULT_PASSWORD)
-            db.session.add(account)
+            if not User.query.filter_by(email=email).first():
+                user = User(
+                    first_name=dept_name,
+                    last_name=label,
+                    email=email,
+                    department_id=dept.department_id,
+                )
+                db.session.add(user)
+                db.session.flush()
+                account = Account(
+                    user_id=user.user_id,
+                    username=username,
+                    role=role,
+                    status="active",
+                    must_change_password=True,
+                )
+                account.set_password(DEFAULT_PASSWORD)
+                db.session.add(account)
 
     db.session.flush()
 
@@ -243,7 +243,7 @@ def _seed_sample_documents():
         "Pending Release": "Accounting Office",
         "Request for PR": "Budget Office",
         "Request for PO": "Budget Office",
-        "For Signature BAC Members - BAC Office": "BAC Office",
+        "For Signature BAC Members - BAC Office": "Bids and Awards Committee (BAC) Office",
         "For Signature of Mayor": "Office of the Mayor",
         "Request for OBR": "Budget Office",
         "For Accounting Staff Validation": "Accounting Office",
@@ -319,7 +319,7 @@ def _seed_sample_documents():
         ("SUPPLY OF OFFICE SUPPLIES Q1 2026", 26000.00, "Closed", "Accounting Office"),
         ("PROCUREMENT OF ROAD REPAIR MATERIALS PHASE 1", 185000.00,
          "For Signature BAC Members - BAC Office", "Engineering"),
-        ("IT EQUIPMENT FOR MUNICIPAL OFFICES 2026", 98000.00, "Closed", "BAC Office"),
+        ("IT EQUIPMENT FOR MUNICIPAL OFFICES 2026", 98000.00, "Closed", "Bids and Awards Committee (BAC) Office"),
         ("CONSTRUCTION OF MULTI-PURPOSE HALL PHASE 1", 500000.00, "Request for PO", "Engineering"),
         ("SUPPLY OF MEDICAL SUPPLIES MHO 2026", 45000.00, "For Signature of Mayor", "Municipal Health Office"),
         ("LANDSCAPING AND MAINTENANCE TOWN PLAZA 2026", 32000.00, "Closed", "Accounting Office"),

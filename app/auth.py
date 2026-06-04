@@ -11,34 +11,32 @@ bp = Blueprint("auth", __name__, url_prefix="/auth")
 @limiter.limit("10 per minute", methods=["POST"])   # brute-force protection
 def login():
     """
-    Authenticate a user by email and password.
+    Authenticate a user by username and password.
     Rate-limited to 10 POST attempts per minute per IP.
     All login attempts (success and failure) are recorded in AuditLog.
     After login, users with must_change_password=True are redirected to the
     forced password-change page before accessing any other route.
     """
     if request.method == "POST":
-        email    = request.form["email"].lower().strip()
-        password = request.form["password"]
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
 
-        user_profile = User.query.filter_by(email=email).first()
-        if not user_profile or not user_profile.account:
+        account = Account.query.filter_by(username=username).first()
+        if not account:
             log_audit(AuditAction.LOGIN_FAILED,
-                      details=f"No account found for email: {email}")
-            flash("No account found with this email.", "danger")
+                      details=f"No account found for username: {username}")
+            flash("No account found with this username.", "danger")
             return redirect(url_for("auth.login"))
-
-        account = user_profile.account
 
         if account.is_deactivated:
             log_audit(AuditAction.LOGIN_FAILED,
-                      details=f"Login attempt on deactivated account: {email}")
+                      details=f"Login attempt on deactivated account: {username}")
             flash("This account has been deactivated. Contact admin.", "danger")
             return redirect(url_for("auth.login"))
 
         if not account.check_password(password):
             log_audit(AuditAction.LOGIN_FAILED,
-                      details=f"Wrong password for: {email}")
+                      details=f"Wrong password for: {username}")
             flash("Incorrect password.", "danger")
             return redirect(url_for("auth.login"))
 
@@ -46,7 +44,6 @@ def login():
         log_audit(AuditAction.LOGIN,
                   details=f"Logged in from {request.remote_addr}")
 
-        # Fix #6 — redirect to forced password change immediately after login
         if account.must_change_password:
             flash("Your password was set by an admin. Please change it now.", "warning")
             return redirect(url_for("auth.force_change_password"))
@@ -60,11 +57,10 @@ def login():
 @login_required
 def force_change_password():
     """
-    Fix #6 — Forced password change for accounts created with a temporary
+    Forced password change for accounts created with a temporary
     admin-set password (must_change_password=True).
     The user cannot navigate away until they complete this.
     """
-    # Already changed — nothing to do
     if not current_user.must_change_password:
         return redirect(url_for("main.dashboard"))
 
