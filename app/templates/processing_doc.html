@@ -96,8 +96,6 @@
     </div>
   </div>
 </div>
-
-<!-- ASSIGN MODAL -->
 <div class="modal fade" id="assignModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -106,29 +104,53 @@
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <div style="background:#F5F0E8;border-radius:5px;padding:10px 12px;margin-bottom:14px;font-size:12px;">
-          <span style="color:var(--muted);">Document:</span>
-          <strong id="assignDocId" style="color:var(--gov-red-dark);font-family:monospace;font-size:11px;"></strong>
-          — <span id="assignDocTitle" style="font-weight:500;"></span>
-        </div>
         <div class="mb-3">
-          <label class="form-label">Assign To <span style="color:#dc2626;">*</span></label>
-          <select class="form-select" id="assignTo">
+          <label class="form-label">Assign To <span class="text-danger">*</span></label>
+          <select class="form-select" id="assignToSelect">
             <option value="" disabled selected>Select staff member...</option>
-            {% for u in dept_users %}
-            <option value="{{ u.full_name }}">{{ u.full_name }}{% if u.id == current_user.id %} (you){% endif %}</option>
-            {% endfor %}
+            {% for u in dept_users %}<option value="{{ u.full_name }}">{{ u.full_name }}</option>{% endfor %}
           </select>
-          <div class="invalid-feedback">Please select a staff member.</div>
         </div>
         <div>
-          <label class="form-label">Remarks <span style="color:var(--muted);font-weight:400;">(optional)</span></label>
-          <textarea class="form-control" id="assignRemarks" rows="2" placeholder="Instructions or notes..."></textarea>
+          <label class="form-label">Remarks <span class="text-muted fw-normal" style="font-size:11px;">(optional)</span></label>
+          <textarea class="form-control" id="assignRemarksInput" rows="2" placeholder="Instructions..."></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-gov-outline" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn-gov" id="confirmAssignBtn"><i class="fa fa-user-check me-1"></i>Confirm Assignment</button>
+        <button class="btn-gov" id="confirmAssignBtn"><i class="fa fa-user-check me-1"></i>Assign</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PULL-OUT MODAL -->
+<div class="modal fade" id="pulloutModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fa fa-arrow-rotate-left me-2"></i>Pull Out Document</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="background:#FDE8E8;border:1px solid #FACACA;border-radius:5px;padding:8px 10px;font-size:12px;color:#8B0000;margin-bottom:14px;">
+          <i class="fa fa-triangle-exclamation me-1"></i> This overrides current routing. Status will become <strong>Pulled Out</strong>.
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Move to Office <span class="text-danger">*</span></label>
+          <select class="form-select" id="pulloutDept">
+            <option value="" disabled selected>Select office...</option>
+            {% for d in departments %}<option value="{{ d.name }}">{{ d.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Reason <span class="text-muted fw-normal" style="font-size:11px;">(optional)</span></label>
+          <textarea class="form-control" id="pulloutRemarks" rows="2" placeholder="Reason for pull-out..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-gov-outline" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-gov" id="confirmPulloutBtn" style="background:#8B0000;border-color:#8B0000;"><i class="fa fa-arrow-rotate-left me-1"></i>Confirm Pull Out</button>
       </div>
     </div>
   </div>
