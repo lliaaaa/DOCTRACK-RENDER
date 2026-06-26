@@ -284,8 +284,6 @@ tr:hover td { background: #FBF8F5; }
     {% block content %}{% endblock %}
 </div>
 
-{% block modals %}{% endblock %}
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 // ── CSRF helper ──────────────────────────────────────────────────────────────
@@ -295,6 +293,8 @@ function getCsrf() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
 </script>
+
+{% block modals %}{% endblock %}
 <script>
 // Sidebar state persistence
 function toggleSidebar() {
