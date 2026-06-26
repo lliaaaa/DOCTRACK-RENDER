@@ -13,6 +13,7 @@
       <h3>Document Information</h3>
     </div>
     <form method="POST" action="{{ url_for('main.add_document') }}" id="newDocForm">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="row g-3">
 
         <!-- STEP 1: Document Type -->
