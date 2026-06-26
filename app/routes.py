@@ -279,9 +279,18 @@ def document_detail(record_id):
     Detailed view of a single document: shows full transaction history,
     SLA progress bar, available workflow actions, and pull-out option (admin).
     """
-    record = visible_documents(current_user.department).filter(
-        Document.document_id == record_id).first()
+    record = db.session.get(Document, record_id)
     if not record: abort(404)
+    # Check visibility: must be from user's dept or have transaction with their dept
+    dept = current_user.department
+    dept_id = get_dept_id(dept)
+    involved = (record.current_department_id == dept_id or
+                record.implementing_office == dept or
+                db.session.query(Transaction).filter_by(document_id=record_id).filter(
+                    db.or_(Transaction.origin == dept, Transaction.destination == dept)
+                ).first() is not None)
+    if not involved and current_user.role != "admin":
+        abort(404)
     departments = Department.query.all()
     document_statuses = DocumentStatus.query.all()
     sla = record.sla_info()
@@ -497,24 +506,20 @@ def add_document():
     POST: Validate and create a new document record, auto-assign workflow
           status based on document type, and record an AuditLog entry.
     """
-    dept_accounts   = get_dept_users(current_user.department)
-    document_type   = DocumentType.query.all()
-    document_status = DocumentStatus.query.all()
-    departments     = Department.query.all()
     if request.method == "POST":
         type_name = request.form["doc_type"]
         dt = DocumentType.query.filter_by(type_name=type_name).first()
-        # For SVP: use a placeholder "Pending Release" until first release
-        # For Bidding and others: use first DB status
         if type_name == SVP_TYPE_NAME:
             auto_status = SVP_INITIAL_STATUS
         else:
             first_status = DocumentStatus.query.order_by(DocumentStatus.id.asc()).first()
             auto_status  = first_status.name if first_status else "Pending"
-        dept_id = get_dept_id(current_user.department)
-        doc_code = generate_document_code()
-        now = datetime.now(timezone.utc)
-        sub_cat = request.form.get("sub_category", "").strip() or None
+        dept_id    = get_dept_id(current_user.department)
+        doc_code   = generate_document_code()
+        now        = datetime.now(timezone.utc)
+        sub_cat    = request.form.get("sub_category", "").strip() or None
+        amount_raw = request.form.get("amount", "").strip()
+        amount     = float(amount_raw) if amount_raw else None
         record = Document(
             document_code=doc_code,
             title=request.form["title"],
@@ -527,8 +532,10 @@ def add_document():
             implementing_office=current_user.department,
             received_by="", remarks=request.form.get("remarks", ""),
             arrived_at=now, updated_at=now,
+            amount=amount,
         )
-        db.session.add(record); db.session.flush()
+        db.session.add(record)
+        db.session.flush()
         db.session.add(make_transaction(
             document_id=record.document_id, transaction_type="create",
             origin=current_user.department, destination=current_user.department,
@@ -539,9 +546,11 @@ def add_document():
                   details=f"Created '{record.title[:80]}' | Type: {type_name} | Dept: {current_user.department}")
         flash(f"Document {record.document_code} added successfully.", "success")
         return redirect(url_for("main.document_detail", record_id=record.document_id))
-    return render_template("admin/new_doc.html", users=dept_accounts,
-                           document_type=document_type, document_status=document_status,
-                           departments=departments, svp_subcategories=SVP_SUBCATEGORIES)
+    # GET: only load what the form actually needs
+    document_type = DocumentType.query.all()
+    return render_template("admin/new_doc.html", users=[],
+                           document_type=document_type, document_status=[],
+                           departments=[], svp_subcategories=SVP_SUBCATEGORIES)
 
 
 # ---------------------------------------------------------------------------
