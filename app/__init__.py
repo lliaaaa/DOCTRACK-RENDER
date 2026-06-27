@@ -228,10 +228,11 @@ def _seed_data():
     db.session.commit()
 
     if Document.query.count() < 5:
-        _seed_sample_documents()
+        _seed_demo_documents()
 
 
-def _seed_sample_documents():
+def _seed_demo_documents():
+    """Seed realistic demo documents with full transaction trails for system demo."""
     from datetime import datetime, timezone, timedelta
 
     svp_dt = DocumentType.query.filter_by(type_name="SVP").first()
@@ -239,118 +240,192 @@ def _seed_sample_documents():
     if not svp_dt or not bid_dt:
         return
 
-    STATUS_TO_DEPT = {
-        "Pending Release": "Accounting Office",
-        "Request for PR": "Budget Office",
-        "Request for PO": "Budget Office",
+    def get_dept(name):
+        return Department.query.filter(Department.department_name.ilike(f"%{name}%")).first()
+
+    def now_minus(days=0):
+        return datetime.now(timezone.utc) - timedelta(days=days)
+
+    WORKFLOW = [
+        "Request for PR", "Request for PO",
+        "For Signature BAC Members - BAC Office",
+        "For Signature of Mayor", "Request for OBR",
+        "For Accounting Staff Validation", "For Processing",
+        "With Checked", "Closed",
+    ]
+
+    STATUS_DEPT = {
+        "Request for PR":                         "Budget Office",
+        "Request for PO":                         "Budget Office",
         "For Signature BAC Members - BAC Office": "Bids and Awards Committee (BAC) Office",
-        "For Signature of Mayor": "Office of the Mayor",
-        "Request for OBR": "Budget Office",
-        "For Accounting Staff Validation": "Accounting Office",
-        "For Processing": "Accounting Office",
-        "With Checked": "Accounting Office",
-        "Closed": "Accounting Office",
-        "Assigned": "Accounting Office",
+        "For Signature of Mayor":                 "Mayor's Office (MO)",
+        "Request for OBR":                        "Budget Office",
+        "For Accounting Staff Validation":        "Accounting Office",
+        "For Processing":                         "Accounting Office",
+        "With Checked":                           "Accounting Office",
+        "Closed":                                 "Accounting Office",
     }
 
-    def get_dept(name):
-        return Department.query.filter_by(department_name=name).first()
+    STEP_REMARKS = {
+        "Request for PR": "PR prepared and forwarded to Budget Office.",
+        "Request for PO": "PO prepared. Awaiting BAC Members signature.",
+        "For Signature BAC Members - BAC Office": "Reviewed and signed by BAC Members. Forwarded to Mayor.",
+        "For Signature of Mayor": "Approved and signed by the Municipal Mayor.",
+        "Request for OBR": "OBR prepared and submitted to Accounting.",
+        "For Accounting Staff Validation": "Validated by Accounting Staff. No discrepancies found.",
+        "For Processing": "Currently being processed by Accounting Office.",
+        "With Checked": "Checked and verified. Awaiting final release.",
+        "Closed": "Document fully processed and released.",
+    }
 
-    now = datetime.now(timezone.utc)
+    ACTORS = [
+        "Maria Santos", "Juan dela Cruz", "Ana Reyes",
+        "Roberto Gomez", "Liza Bautista", "Carlos Mendoza",
+        "Gloria Fernandez", "Eduardo Villanueva",
+    ]
+
+    acctg_dept = get_dept("Accounting")
+    budget_dept = get_dept("Budget")
+    bac_dept    = get_dept("Bids and Awards")
+    mayor_dept  = get_dept("Mayor's Office")
+
     admin_user = User.query.first()
-    implementing = "Accounting Office"
+    creator_id = admin_user.user_id if admin_user else None
 
-    svp_samples = [
-        ("REIMBURSEMENT OF DIESEL EXPENSES FOR OFFICIAL USE OF OLD PTV AMBULANCE FOR THE MONTH OF MARCH 2026",
-         "Reimbursement of Diesel", 3500.00, "Closed"),
-        ("EVENTS AND SEMINARS - MUNICIPAL SPORTS FEST 2025",
-         "Events and Seminars", 15000.00, "Closed"),
-        ("REIMBURSEMENT OF TARPAULIN EXPENSES FOR FIESTA CELEBRATION APRIL 2026",
-         "Reimbursement of Tarpaulin", 1200.00, "With Checked"),
-        ("REIMBURSEMENT OF DIESEL EXPENSES FOR OFFICIAL USE OF BACKHOE FOR THE PERIOD OF MARCH 10, 12, 2026",
-         "Reimbursement of Diesel", 4800.00, "For Processing"),
-        ("EVENTS AND SEMINARS - LGU ORIENTATION WORKSHOP JANUARY 2026",
-         "Events and Seminars", 22000.00, "For Signature of Mayor"),
-        ("REIMBURSEMENT OF DIESEL EXPENSES FOR OFFICIAL USE OF DUMP TRUCK FOR THE MONTH OF FEBRUARY 2026",
-         "Reimbursement of Diesel", 2700.00, "Request for OBR"),
-        ("EVENTS AND SEMINARS - YEAR-END ASSESSMENT DECEMBER 2025",
-         "Events and Seminars", 18500.00, "Request for PO"),
-        ("REIMBURSEMENT OF TARPAULIN EXPENSES FOR ENVIRONMENT DAY MAY 2026",
-         "Reimbursement of Tarpaulin", 980.00, "Request for PR"),
-        ("REIMBURSEMENT OF DIESEL EXPENSES FOR OFFICIAL USE OF PATROL VEHICLE FOR THE MONTH OF APRIL 2026",
-         "Reimbursement of Diesel", 3200.00, "Closed"),
-        ("EVENTS AND SEMINARS - DISASTER RISK TRAINING Q1 2026",
-         "Events and Seminars", 30000.00, "For Accounting Staff Validation"),
-        ("REIMBURSEMENT OF TARPAULIN EXPENSES FOR ELECTION AWARENESS DRIVE MARCH 2026",
-         "Reimbursement of Tarpaulin", 750.00, "Closed"),
-        ("EVENTS AND SEMINARS - MUNICIPAL BUDGET FORUM FEBRUARY 2026",
-         "Events and Seminars", 12500.00, "For Signature BAC Members - BAC Office"),
-    ]
+    def make_code(n, days_ago):
+        fake_dt = datetime.now() - timedelta(days=days_ago)
+        ts = fake_dt.strftime("%m%d%Y%H%M%S")
+        return f"DOC{ts}{n:03d}"
 
-    for i, (title, subcat, amount, status) in enumerate(svp_samples):
-        code = f"DOCSEED{i+1:05d}"
+    def build_trail(doc, status, impl_name, base_dt):
+        target_idx = WORKFLOW.index(status) if status in WORKFLOW else 0
+        for i in range(target_idx + 1):
+            step = WORKFLOW[i]
+            prev = WORKFLOW[i - 1] if i > 0 else None
+            origin = STATUS_DEPT.get(prev, impl_name) if prev else impl_name
+            destination = STATUS_DEPT.get(step, impl_name)
+            step_dt = base_dt + timedelta(days=i * 2, hours=i)
+            txn_type = "create" if i == 0 else "release"
+            actor = ACTORS[i % len(ACTORS)]
+            db.session.add(Transaction(
+                document_id=doc.document_id,
+                transaction_type=txn_type,
+                origin=origin,
+                destination=destination,
+                action_by_name=actor,
+                status=step,
+                datetime=step_dt,
+                remarks=STEP_REMARKS.get(step) if i > 0 else "Document submitted for processing.",
+            ))
+
+    def add_doc(code, title, doc_type_id, subcat, amount, status, priority, impl_name, impl_dept, days_ago):
         if Document.query.filter_by(document_code=code).first():
-            continue
-        days_ago = 30 - (i * 2)
-        doc_date = now - timedelta(days=days_ago)
-        dept_name = STATUS_TO_DEPT.get(status, implementing)
-        dept = get_dept(dept_name) or get_dept(implementing)
+            return
+        base_dt = now_minus(days=days_ago)
+        step_idx = WORKFLOW.index(status) if status in WORKFLOW else 0
+        curr_dept_name = STATUS_DEPT.get(status, impl_name)
+        curr_dept = get_dept(curr_dept_name) or impl_dept or acctg_dept
         doc = Document(
             document_code=code, title=title,
-            document_type_id=svp_dt.document_type_id,
+            document_type_id=doc_type_id,
             sub_category=subcat,
-            created_by=admin_user.user_id if admin_user else None,
-            datetime=doc_date, status=status,
-            priority=["Normal", "Urgent", "Normal", "Routine"][i % 4],
-            current_department_id=dept.department_id,
-            implementing_office=implementing,
-            amount=amount, arrived_at=doc_date, updated_at=doc_date,
+            created_by=creator_id,
+            datetime=base_dt, status=status, priority=priority,
+            current_department_id=curr_dept.department_id if curr_dept else None,
+            implementing_office=impl_name,
+            amount=amount,
+            arrived_at=base_dt,
+            updated_at=base_dt + timedelta(days=step_idx * 2),
             received_by="",
         )
         db.session.add(doc)
         db.session.flush()
-        db.session.add(Transaction(
-            document_id=doc.document_id, transaction_type="create",
-            origin=implementing, destination=dept_name,
-            action_by_name="System Seed", status=status, datetime=doc_date,
-        ))
+        build_trail(doc, status, impl_name, base_dt)
 
-    bid_samples = [
-        ("SUPPLY OF OFFICE SUPPLIES Q1 2026", 26000.00, "Closed", "Accounting Office"),
-        ("PROCUREMENT OF ROAD REPAIR MATERIALS PHASE 1", 185000.00,
-         "For Signature BAC Members - BAC Office", "Engineering"),
-        ("IT EQUIPMENT FOR MUNICIPAL OFFICES 2026", 98000.00, "Closed", "Bids and Awards Committee (BAC) Office"),
-        ("CONSTRUCTION OF MULTI-PURPOSE HALL PHASE 1", 500000.00, "Request for PO", "Engineering"),
-        ("SUPPLY OF MEDICAL SUPPLIES MHO 2026", 45000.00, "For Signature of Mayor", "Municipal Health Office"),
-        ("LANDSCAPING AND MAINTENANCE TOWN PLAZA 2026", 32000.00, "Closed", "Accounting Office"),
+    # ── SVP Documents (13 docs, various stages) ──────────────────────────────
+    SVP = [
+        ("REIMBURSEMENT OF DIESEL EXPENSES — DUMP TRUCK OFFICIAL USE MARCH 2026",
+         "Reimbursement of Diesel", 4800.00, "Closed", "Normal",
+         "Municipal Engineering Office (MEO)", "Engineering", 55),
+        ("REIMBURSEMENT OF DIESEL EXPENSES — PATROL VEHICLE FEBRUARY 2026",
+         "Reimbursement of Diesel", 3200.00, "Closed", "Normal",
+         "Mayor's Office (MO)", "Mayor", 48),
+        ("EVENTS AND SEMINARS — LGU YEAR-END ASSESSMENT DECEMBER 2025",
+         "Events and Seminars", 22000.00, "Closed", "Normal",
+         "Human Resource Management Office (HRMO)", "Human Resource", 70),
+        ("EVENTS AND SEMINARS — MUNICIPAL BUDGET PLANNING FORUM JANUARY 2026",
+         "Events and Seminars", 18500.00, "Closed", "Normal",
+         "Budget Office", "Budget", 60),
+        ("REIMBURSEMENT OF TARPAULIN EXPENSES — PALARONG UNISAN SPORTS FEST APRIL 2026",
+         "Reimbursement of Tarpaulin", 1850.00, "Closed", "Normal",
+         "Mayor's Office (MO)", "Mayor", 40),
+        ("REIMBURSEMENT OF DIESEL EXPENSES — BACKHOE OFFICIAL USE MARCH 10–14, 2026",
+         "Reimbursement of Diesel", 6500.00, "With Checked", "Urgent",
+         "Municipal Engineering Office (MEO)", "Engineering", 18),
+        ("EVENTS AND SEMINARS — DISASTER RISK REDUCTION TRAINING Q1 2026",
+         "Events and Seminars", 30000.00, "For Processing", "Normal",
+         "Municipal Disaster Risk Reduction and Management Office (MDRRMO)", "Disaster", 14),
+        ("REIMBURSEMENT OF TARPAULIN EXPENSES — ENVIRONMENT AWARENESS MONTH MAY 2026",
+         "Reimbursement of Tarpaulin", 980.00, "For Accounting Staff Validation", "Normal",
+         "Municipal Environment and Natural Resources Office (MENRO)", "Accounting", 10),
+        ("EVENTS AND SEMINARS — SOCIAL WELFARE OUTREACH PROGRAM MARCH 2026",
+         "Events and Seminars", 15000.00, "For Signature of Mayor", "Urgent",
+         "Municipal Social Welfare and Development Office (MSWDO)", "Mayor", 7),
+        ("REIMBURSEMENT OF DIESEL EXPENSES — AMBULANCE OFFICIAL USE APRIL 2026",
+         "Reimbursement of Diesel", 3500.00, "Request for OBR", "Normal",
+         "Mayor's Office (MO)", "Budget", 5),
+        ("EVENTS AND SEMINARS — HRMO CAPABILITY BUILDING SEMINAR MAY 2026",
+         "Events and Seminars", 28000.00, "For Signature BAC Members - BAC Office", "Normal",
+         "Human Resource Management Office (HRMO)", "Bids and Awards", 3),
+        ("REIMBURSEMENT OF TARPAULIN EXPENSES — FIESTA CELEBRATION UNISAN 2026",
+         "Reimbursement of Tarpaulin", 2200.00, "Request for PO", "Routine",
+         "Mayor's Office (MO)", "Budget", 2),
+        ("REIMBURSEMENT OF DIESEL EXPENSES — DUMP TRUCK MAY 2026",
+         "Reimbursement of Diesel", 5100.00, "Request for PR", "Normal",
+         "Municipal Engineering Office (MEO)", "Budget", 1),
     ]
 
-    for i, (title, amount, status, impl_office) in enumerate(bid_samples):
-        code = f"DOCSEED{len(svp_samples)+i+1:05d}"
-        if Document.query.filter_by(document_code=code).first():
-            continue
-        days_ago = 60 - (i * 5)
-        doc_date = now - timedelta(days=days_ago)
-        dept_name = STATUS_TO_DEPT.get(status, impl_office)
-        dept = get_dept(dept_name) or get_dept(impl_office)
-        doc = Document(
-            document_code=code, title=title,
-            document_type_id=bid_dt.document_type_id,
-            created_by=admin_user.user_id if admin_user else None,
-            datetime=doc_date, status=status,
-            priority=["Normal", "Urgent"][i % 2],
-            current_department_id=dept.department_id,
-            implementing_office=impl_office,
-            amount=amount, arrived_at=doc_date, updated_at=doc_date,
-            received_by="",
-        )
-        db.session.add(doc)
-        db.session.flush()
-        db.session.add(Transaction(
-            document_id=doc.document_id, transaction_type="create",
-            origin=impl_office, destination=dept_name,
-            action_by_name="System Seed", status=status, datetime=doc_date,
-        ))
+    for i, (title, subcat, amount, status, priority, impl_name, dept_hint, days_ago) in enumerate(SVP):
+        add_doc(make_code(i+1, days_ago), title, svp_dt.document_type_id, subcat,
+                amount, status, priority, impl_name, get_dept(dept_hint), days_ago)
+
+    # ── Bidding Documents (10 docs, various stages) ───────────────────────────
+    BID = [
+        ("PROCUREMENT OF OFFICE SUPPLIES AND MATERIALS FOR ALL DEPARTMENTS Q1 2026",
+         55000.00, "Closed", "Normal",
+         "Bids and Awards Committee (BAC) Office", "Bids and Awards", 80),
+        ("SUPPLY AND DELIVERY OF IT EQUIPMENT — MUNICIPAL OFFICES 2026",
+         98000.00, "Closed", "Normal",
+         "Bids and Awards Committee (BAC) Office", "Bids and Awards", 65),
+        ("LANDSCAPING AND MAINTENANCE OF UNISAN MUNICIPAL PLAZA 2026",
+         32000.00, "Closed", "Normal",
+         "Accounting Office", "Accounting", 50),
+        ("PROCUREMENT OF MEDICAL AND DENTAL SUPPLIES — MHO/RHU 2026",
+         45000.00, "With Checked", "Urgent",
+         "Municipal Health Office/Rural Health Unit (MHO/RHU)", "Accounting", 22),
+        ("CONSTRUCTION OF MULTI-PURPOSE COVERED COURT — BARANGAY VILLA REYES",
+         500000.00, "For Signature of Mayor", "Urgent",
+         "Municipal Engineering Office (MEO)", "Mayor", 12),
+        ("REPAIR AND REHABILITATION OF FARM-TO-MARKET ROAD — BRGY. SAN ISIDRO PHASE 1",
+         185000.00, "For Signature BAC Members - BAC Office", "Normal",
+         "Municipal Engineering Office (MEO)", "Bids and Awards", 8),
+        ("SUPPLY OF AGRICULTURAL INPUTS AND SEEDLINGS — MAO PROGRAM 2026",
+         38000.00, "For Processing", "Normal",
+         "Municipal Agriculture Office (MAO)", "Accounting", 6),
+        ("PROCUREMENT OF DISASTER RESPONSE EQUIPMENT — MDRRMO 2026",
+         120000.00, "Request for OBR", "Urgent",
+         "Municipal Disaster Risk Reduction and Management Office (MDRRMO)", "Budget", 4),
+        ("SUPPLY OF JANITORIAL AND SANITATION SUPPLIES — ALL OFFICES Q2 2026",
+         18500.00, "Request for PO", "Routine",
+         "Accounting Office", "Budget", 2),
+        ("PROCUREMENT OF COMMUNICATION EQUIPMENT — MAYOR'S OFFICE 2026",
+         75000.00, "Request for PR", "Normal",
+         "Mayor's Office (MO)", "Budget", 1),
+    ]
+
+    for i, (title, amount, status, priority, impl_name, dept_hint, days_ago) in enumerate(BID):
+        add_doc(make_code(i+50, days_ago), title, bid_dt.document_type_id, None,
+                amount, status, priority, impl_name, get_dept(dept_hint), days_ago)
 
     db.session.commit()
 
